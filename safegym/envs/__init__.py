@@ -1,13 +1,20 @@
 from gymnasium.envs.registration import register
 
-from envs.Snake_v0 import SnakeEnv
-from envs.Satellite_rot import Satellite_rot
-from envs.Satellite_tra import Satellite_tra
-from envs.Satellite_mujoco import MujSatEnv
+from safegym.envs.Snake_v0 import SnakeEnv
+from safegym.envs.Satellite_rot import Satellite_rot
+from safegym.envs.Satellite_tra import Satellite_tra
+from safegym.envs.Satellite_mujoco import MujSatEnv
+from safegym.envs.Satellite_SE2 import Satellite_SE2
 
-__al__ = ["SnakeEnv", "Satellite_rot", "Satellite_tra", "MujSatEnv"]
+__al__ = [
+    "SnakeEnv",
+    "Satellite_rot",
+    "Satellite_tra",
+    "MujSatEnv",
+    "Satellite_SE2",
+]
 
-__version__ = "0.0.1"
+__version__ = "0.1"
 
 register(
     id="Snake-v0",
@@ -43,5 +50,12 @@ register(
     id="Satellite-mj-v0",
     entry_point="Envs.Satellite_mujoco:MujSatEnv",
     max_episode_steps=60_000,
+    reward_threshold=0.0,
+)
+
+register(
+    id="Satellite-SE2-v0",
+    entry_point="Envs.Satellite_SE2:Satellite_SE2",
+    max_episode_steps=600_000,
     reward_threshold=0.0,
 )

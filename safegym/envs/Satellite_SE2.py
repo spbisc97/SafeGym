@@ -260,9 +260,13 @@ class Satellite_SE2(gym.Env):
         length = 5.0
         end_x = length * np.sin(theta[0])
         end_y = length * np.cos(theta[0])
-        self.ax.plot(
-            [0, end_x],
-            [0, end_y],
+        self.ax.arrow(
+            0,
+            0,
+            end_x,
+            end_y,
+            head_width=1,
+            head_length=2,
             color="red",
         )
 
@@ -303,15 +307,25 @@ class Satellite_SE2(gym.Env):
             length = chaser_control[0]
             end_x = chaser_state[0] + length * np.sin(chaser_state[2])
             end_y = chaser_state[1] + length * np.cos(chaser_state[2])
+            self.ax.plot(
+                [chaser_state[0], end_x],
+                [chaser_state[1], end_y],
+                color="red",
+            )
         else:
             length = np.linalg.norm(chaser_control[0:2])
             end_x = chaser_state[0] + chaser_control[0]
             end_y = chaser_state[1] + chaser_control[1]
-        self.ax.plot(
-            [chaser_state[0], end_x],
-            [chaser_state[1], end_y],
-            color="red",
-        )
+            self.ax.plot(
+                [chaser_state[0], end_x],
+                [chaser_state[1], chaser_state[1]],
+                color="red",
+            )
+            self.ax.plot(
+                [chaser_state[0], chaser_state[0]],
+                [chaser_state[1], end_y],
+                color="red",
+            )
 
         # Legend, grid, and title
         self.ax.legend()
@@ -742,7 +756,7 @@ def _test5():
     env.action_space.sample()
     print(env.action_space.sample())
 
-    for _ in range(100000):
+    for _ in range(20000):
         action = -k @ env.chaser.get_state()
 
         if np.linalg.norm(action) > 1:
@@ -766,6 +780,8 @@ def _test5():
 
 
 def _test6():
+    from moviepy.editor import ImageSequenceClip
+
     k = np.array(
         [
             [
@@ -799,7 +815,7 @@ def _test6():
     starting_state[1] = 30
     env = Satellite_SE2(
         underactuated=False,
-        render_mode=None,
+        render_mode="rgb_array",
         max_action=1,  # set to 1 for nomal control
         starting_state=starting_state,
         starting_noise=np.zeros((8,)),
@@ -807,17 +823,103 @@ def _test6():
     observation, info = env.reset()
     observations = [observation]
     rewards = []
+    frames = [env.render()]
     action = np.array([0, 0, 0], dtype=np.float32)
     env.action_space.sample()
     print(env.action_space.sample())
-    for _ in range(10000):
+    for _ in range(500000):
         action = -k @ env.chaser.get_state()
         if np.linalg.norm(action) > 1:
             action = action / np.norm(action)
         observation, reward, term, trunc, info = env.step(action)
         observations.append(observation)
         rewards.append(reward)
+        if _ % 50 == 0:
+            frames.append(env.render())
     env.close()
+    clip = ImageSequenceClip(frames, fps=100)
+    save_path = "./video_fully_lqr.mp4"
+    clip.write_videofile(save_path, fps=100)
+
+
+def _test8():
+    from moviepy.editor import ImageSequenceClip
+
+    k = np.array(
+        [
+            [
+                0.000212278114670,
+                -0.000083701859629,
+                0.000000000000000,
+                0.098840940992828,
+                0.018561185733915,
+                0.000000000000000,
+            ],
+            [
+                0.000133845264885,
+                0.000054717444153,
+                0.000000000000000,
+                0.018561185733917,
+                0.074573364422630,
+                0.000000000000000,
+            ],
+            [
+                0.000000000000000,
+                0.000000000000000,
+                0.000100000000000,
+                -0.000000000000000,
+                0.000000000000000,
+                0.015818032751518,
+            ],
+        ],
+        dtype=np.float32,
+    )
+    starting_state = np.zeros((8,))
+    starting_state[1] = 30
+    env = Satellite_SE2(
+        underactuated=True,
+        render_mode="rgb_array",
+        max_action=1,  # set to 1 for nomal control
+        starting_state=starting_state,
+        starting_noise=np.zeros((8,)),
+    )
+    observation, info = env.reset()
+    observations = [observation]
+    rewards = []
+    frames = [env.render()]
+    actions = []
+    action_full = np.array([0, 0, 0], dtype=np.float32)
+    action_under = np.array([0, 0], dtype=np.float32)
+    env.action_space.sample()
+    print(env.action_space.sample())
+    for _ in range(50000):
+        state = env.chaser.get_state()
+        action_full = -k @ env.chaser.get_state()
+        req_state = np.array(
+            [0, 0, np.arctan2(action_full[0], action_full[1]), 0, 0, 0],
+            dtype=np.float32,
+        )
+        error = req_state - env.chaser.get_state()
+        action_under = [
+            np.linalg.norm(action_full[0:2]) / (1 + 10 * error[3] ** 2),
+            k[2, :] @ (error),
+        ]
+        # if np.linalg.norm(action) > 1:
+        # action = action / np.norm(action)
+        observation, reward, term, trunc, info = env.step(action_under)
+        actions.append(action_under)
+        observations.append(observation)
+        rewards.append(reward)
+        if _ % 50 == 0:
+            frames.append(env.render())
+
+    env.close()
+
+    clip = ImageSequenceClip(frames, fps=100)
+    save_path = "./video_under_lqr.mp4"
+    clip.write_videofile(save_path, fps=100)
+    plt.plot(actions)
+    plt.show()
 
 
 def _scalene_profiler():
@@ -831,4 +933,4 @@ def _scalene_profiler():
 if __name__ == "__main__":
     from gymnasium.envs.registration import register
 
-    _test3()
+    _test8()

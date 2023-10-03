@@ -2,7 +2,7 @@
 
 Implementation of satellite environments and other environments to explore SafeRL
 
-![Alt Text](safegym/docs/video_lqr.gif)
+![safegym/docs/video_lqr.gif](https://github.com/spbisc97/SafeGym/blob/main/safegym/video_lqr.gif)
 
 ## Getting Started
 

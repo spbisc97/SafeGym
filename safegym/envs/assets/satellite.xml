@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mujoco model="satellite_chaser">
+    <compiler coordinate="local" inertiafromgeom="true" />
+    <asset>
+        <texture name="skybox" type="skybox" builtin="gradient" rgb1=".4 .6 .8" rgb2="0 0 0"
+            width="800" height="800" mark="random" markrgb="1 1 1" />
+    </asset>
+    <option gravity="0 0 0" timestep="0.001" />
+    <default>
+        <joint />
+        <default class="dhinge">
+            <joint armature="0" damping="0.1" limited="true" range="-20 20" />
+        </default>
+        <default class="gyros">
+            <joint armature="0" damping="0.1" limited="false" />
+        </default>
+    </default>
+    <option integrator="RK4" timestep="0.01" />
+    <worldbody>
+        <body name="chaser" pos="0 0 0">
+            <camera name="chaser_3rd" mode="fixed" pos="0 -3 1" xyaxes="1 0 0 0 0 1" fovy="90" />
+            <joint axis="1 0 0" type="free" />
+            <geom size="0.5 1 0.5" type="box" rgba=".8 .2 0 0.3" mass="10" />
+            <body name="cy" pos="0 -1 0">
+                <joint class="dhinge" axis="1 0 0" name="motor_joint_vertical" />
+                <joint class="dhinge" axis="0 0 1" name="motor_joint_horizontal" />
+                <geom name="cy" type="cylinder" pos="0 0 0" size="0.1 0.2" rgba=".8 .8 .8 1"
+                    quat="0.7071 0.7071 0 0  " mass="0.5" />
+                <body name="motor" pos="0 -0.2 0" quat="0.7071 -0.7071 0 0">
+                    <geom size=".05 .0025" type="cylinder" mass="0" />
+                    <site name="motor_push" pos="0 0 0" size="0.01" type="cylinder" />
+                </body>
+            </body>
+            <body name="gyros" pos="0 0 0"
+                euler="45 135 0 ">
+                <geom name="gyro_case" type="box" pos="0 0 0" size="0.2 0.2 0.2" rgba=".8 .8 .8 0.5"
+                    mass="0" />
+
+                <body pos="0 0.35 0">
+                    <joint axis="0 1 0" class="gyros" name="gyro_1_joint" type="hinge" />
+                    <geom name="gyro1" type="cylinder" pos="0 0 0" size="0.25 0.05"
+                        rgba=".8 .8 .8 1"
+                        quat="0.7071 0.7071 0 0" mass="0.5" />
+                </body>
+                <body pos="0.35 0 0">
+                    <joint axis="1 0 0" class="gyros" name="gyro_2_joint" type="hinge" />
+                    <geom name="gyro2" type="cylinder" pos="0 0 0" size="0.25 0.05"
+                        rgba=".8 .8 .8 1"
+                        quat="0.7071  0 0.7071 0" mass="0.5" />
+                </body>
+                <body pos="0 0 0.35">
+                    <joint axis="0 0 1" class="gyros" name="gyro_3_joint" type="hinge" />
+                    <geom name="gyro3" type="cylinder" pos="0 0 0" size="0.25 0.05"
+                        rgba=".8 .8 .8 1"
+                        quat="0.7071 0 0  0.7071 " mass="0.5" />
+                </body>
+            </body>
+        </body>
+        <body name="target" pos="1 2 3">
+            <camera name="track_chaser" mode="targetbodycom" target="chaser" pos="0 0 0" fovy="90" />
+            <joint type="free" />
+            <geom size="1 1 1" type="box" rgba="0 0 0 0.1" />
+        </body>
+    </worldbody>
+    <actuator>
+        <motor ctrllimited="true" ctrlrange="0 1" gear="0. 0. 0.1 0. 0. 0." site="motor_push"
+        />
+        <velocity ctrllimited="true" gear="0.05" ctrlrange="-1 1" joint="motor_joint_vertical" />
+        <velocity ctrllimited="true" gear="0.05" ctrlrange="-1 1"
+            joint="motor_joint_horizontal" />
+
+        <motor ctrllimited="true" ctrlrange="-1.0 1.0" gear="1." joint="gyro_1_joint" />
+        <motor ctrllimited="true" ctrlrange="-1.0 1.0" gear="1." joint="gyro_2_joint" />
+        <motor ctrllimited="true" ctrlrange="-1.0 1.0" gear="1." joint="gyro_3_joint" />
+    </actuator>
+</mujoco>

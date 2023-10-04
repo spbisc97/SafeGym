@@ -387,9 +387,9 @@ class Satellite_SE2(gym.Env):
         ch_speed = self.chaser.speed()
 
         reward += (
-            (-np.log10(ch_radius + 1e-3))
-            - (ch_control[0] ** 2 + ch_control[1] ** 2)
-            + (-np.log10(ch_speed + 1e-3))
+            (-np.log10(ch_radius + 0 / 5))
+            - (np.norm(ch_control) * 5)
+            - (np.log10(ch_speed + 1))
         )
         return reward
 
@@ -823,7 +823,7 @@ def _test6():
     starting_state[1] = 60
     env = Satellite_SE2(
         underactuated=False,
-        render_mode="rgb_array",
+        render_mode=None,
         max_action=1,  # set to 1 for nomal control
         starting_state=starting_state,
         starting_noise=np.zeros((8,)),
@@ -848,6 +848,8 @@ def _test6():
         if _ % 50 == 0:
             frames.append(env.render())
     env.close()
+    plt.plot(rewards)
+    plt.show()
     clip = ImageSequenceClip(frames, fps=100)
     save_path = "./video_fully_lqr.mp4"
     clip.write_videofile(save_path, fps=100)
@@ -947,4 +949,4 @@ def _scalene_profiler():
 if __name__ == "__main__":
     from gymnasium.envs.registration import register
 
-    _test8()
+    _test6()

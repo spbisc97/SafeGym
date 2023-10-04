@@ -956,3 +956,12 @@ if __name__ == "__main__":
     from gymnasium.envs.registration import register
 
     _test6()
+
+try:
+    from numba import jit_module
+    jit_module(nopython=True, error_model="numpy")
+    print("Using Numba optimised methods.")
+
+except ModuleNotFoundError:
+    print("Using native Python methods.")
+    print("Consider installing numba for compiled and parallelised methods.")

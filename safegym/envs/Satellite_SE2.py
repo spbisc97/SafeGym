@@ -30,9 +30,9 @@ XY_MAX = 1000  # [m]
 XY_PLOT_MAX = 1000  # [m]
 
 
-STARTING_STATE = np.array([30, 30, 0, 0, 0, 0, 0, 0], dtype=np.float32)
+STARTING_STATE = np.array([0, 0, 0, 0, 0, 0, 0, 0], dtype=np.float32)
 
-STARTING_NOISE = np.array([5, 5, np.pi / 2, 1e-6, 1e-6, 1e-6, 0, 0])
+STARTING_NOISE = np.array([10, 10, np.pi / 2, 1e-6, 1e-6, 1e-6, 0, 0])
 
 EULER_SPEEDUP = True
 
@@ -959,6 +959,7 @@ if __name__ == "__main__":
 
 try:
     from numba import jit_module
+
     jit_module(nopython=True, error_model="numpy")
     print("Using Numba optimised methods.")
 

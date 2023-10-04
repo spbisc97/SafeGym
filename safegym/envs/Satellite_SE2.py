@@ -530,17 +530,13 @@ class Satellite_SE2(gym.Env):
             u = self.get_control()
             k1 = self.__sat_dyn(t, w, u)
             self.set_state(w + ts * (k1))
-
-            if EULER_SPEEDUP:
-                return self.state
-
-            k2 = self.__sat_dyn(t + 0.5 * ts, w + 0.5 * ts * k1, u)
-            k3 = self.__sat_dyn(t + 0.5 * ts, w + 0.5 * ts * k2, u)
-            k4 = self.__sat_dyn(t + ts, w + ts * k3, u)
-            self.set_state(w + ts * (k1 + 2 * k2 + 2 * k3 + k4) / 6)
-            # Maybe np Vectorized calculation of k1, k2, k3, and k4
-            # could speedup the code
             return self.state
+
+            # k2 = self.__sat_dyn(t + 0.5 * ts, w + 0.5 * ts * k1, u)
+            # k3 = self.__sat_dyn(t + 0.5 * ts, w + 0.5 * ts * k2, u)
+            # k4 = self.__sat_dyn(t + ts, w + ts * k3, u)
+            # self.set_state(w + ts * (k1 + 2 * k2 + 2 * k3 + k4) / 6)
+            # return self.state
 
         def reset(self, state=np.zeros((6,), dtype=np.float32)):
             self.set_state(state)
@@ -952,10 +948,6 @@ def _scalene_profiler():
     scalene_profiler.stop()
 
 
-if __name__ == "__main__":
-    from gymnasium.envs.registration import register
-
-    _test6()
 
 try:
     from numba import jit_module
@@ -966,3 +958,8 @@ try:
 except ModuleNotFoundError:
     print("Using native Python methods.")
     print("Consider installing numba for compiled and parallelised methods.")
+
+if __name__ == "__main__":
+    from gymnasium.envs.registration import register
+
+    _test6()

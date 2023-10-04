@@ -30,9 +30,9 @@ XY_MAX = 1000  # [m]
 XY_PLOT_MAX = 1000  # [m]
 
 
-STARTING_STATE = np.array([0, 1000, 0, 0, 0, 0, 0, 0], dtype=np.float32)
+STARTING_STATE = np.array([30, 30, 0, 0, 0, 0, 0, 0], dtype=np.float32)
 
-STARTING_NOISE = np.array([10, 10, np.pi / 2, 1e-5, 1e-5, 1e-4, 0, 0])
+STARTING_NOISE = np.array([5, 5, np.pi / 2, 1e-6, 1e-6, 1e-6, 0, 0])
 
 EULER_SPEEDUP = True
 
@@ -287,7 +287,9 @@ class Satellite_SE2(gym.Env):
             [chaser_state[0], end_x],
             [chaser_state[1], end_y],
             color="green",
-            label="V:{:.2e}".format(np.linalg.norm(chaser_state[3:5])),
+            label=f"V:{np.linalg.norm(chaser_state[3:5]):.2e}"
+            + "\n"
+            + f"Vrot:{np.linalg.norm(chaser_state[5]):.2e}",
         )
 
         # Draw orientation of chaser as a short line
@@ -334,6 +336,8 @@ class Satellite_SE2(gym.Env):
                 + "\n"
                 + f"T:{np.linalg.norm(chaser_control[2]):.2e}",
             )
+
+        self.ax.plot([], color="blue", label=f"Rew: {self.__reward():.2e}")
 
         # Legend, grid, and title
         self.ax.legend()
@@ -385,11 +389,13 @@ class Satellite_SE2(gym.Env):
         ch_radius = self.chaser.radius()
         ch_control = self.chaser.get_control()
         ch_speed = self.chaser.speed()
+        ch_state = self.chaser.get_state()
 
         reward += (
             (-np.log10(ch_radius + 0.9))
             - (np.linalg.norm(ch_control) * 5)
-            - (np.log10(ch_speed + 1))
+            - (np.log10(ch_speed + 1))  # chaser speed
+            - np.linalg.norm(ch_state[5])  # angular velocity
         )
         return reward
 

@@ -11,8 +11,7 @@ import gymnasium as gym
 from gymnasium import spaces
 import numpy as np
 from scipy.integrate import odeint, solve_ivp
-from numba import jit
-from numba.experimental import jitclass
+  
 import random
 import time
 import warnings
@@ -388,7 +387,7 @@ class Chaser:
         return self.state
 
     @staticmethod  # make this static to compile with numba, and prevent cross slow down
-    @jit(nopython=True)  # 1/30 of the time when compiled (mostly becaus of cross)
+       # 1/30 of the time when compiled (mostly becaus of cross)
     def _Sat_Rotational_Dyn(t, y, trust):
         def vel_omega(w):
             return np.array(
@@ -424,7 +423,7 @@ class Chaser:
         return dy
 
     @staticmethod
-    @jit(nopython=True)
+     
     def omega(q):
         mat = np.array(
             [
@@ -489,7 +488,7 @@ class Chaser:
         return e
 
     @staticmethod
-    @jit(nopython=True)
+     
     def quat_inv(q):
         # shouldnt be needed the denominator is always 1
         den = np.dot(q, q)
@@ -497,7 +496,7 @@ class Chaser:
 
 
 # i could use abr_control
-@jit(nopython=True)
+ 
 def eul_to_quat(eul):
     """
     Convert an Euler angle to a quaternion.
@@ -527,7 +526,7 @@ def eul_to_quat(eul):
     return [qw, qx, qy, qz]
 
 
-@jit(nopython=True)
+ 
 def quaternion_to_euler(q):
     w, x, y, z = q
     t0 = +2.0 * (w * x + y * z)
@@ -622,6 +621,18 @@ def scalene_profiler(fun):
     scalene_profiler.start()
     fun()
     scalene_profiler.stop()
+
+
+
+try:
+    from numba import jit_module
+
+    jit_module(nopython=True, error_model="numpy")
+    print("Using Numba optimised methods.")
+
+except ModuleNotFoundError:
+    print("Using native Python methods.")
+    print("Consider installing numba for compiled and parallelised methods.")
 
     
 

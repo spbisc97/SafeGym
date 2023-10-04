@@ -9,7 +9,7 @@ import gymnasium as gym
 from gymnasium import spaces
 import numpy as np
 from scipy.integrate import odeint, solve_ivp
-from numba import jit  # or try codonpy instead
+    # or try codonpy instead
 
 
 # ? Maybe it's better to normalize the observation space?
@@ -563,6 +563,16 @@ def test_env(render_mode=None, control="PID", matplotlib_backend=None):
     plt.show()
     #
     env.close()
+
+try:
+    from numba import jit_module
+
+    jit_module(nopython=True, error_model="numpy")
+    print("Using Numba optimised methods.")
+
+except ModuleNotFoundError:
+    print("Using native Python methods.")
+    print("Consider installing numba for compiled and parallelised methods.")
 
 
 if __name__ == "__main__":

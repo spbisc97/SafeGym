@@ -1,7 +1,7 @@
 import gymnasium as gym
 from gymnasium import spaces
 import numpy as np
-from numba import jit
+  
 
 
 # ? Maybe it's better to normalize the observation space?
@@ -277,6 +277,16 @@ class Chaser:
             k4 = f(y[i] + k3 * h, t[i] + h, *args)
             y[i + 1] = y[i] + (h / 6.0) * (k1 + 2 * k2 + 2 * k3 + k4)
         return y[-1]
+
+try:
+    from numba import jit_module
+
+    jit_module(nopython=True, error_model="numpy")
+    print("Using Numba optimised methods.")
+
+except ModuleNotFoundError:
+    print("Using native Python methods.")
+    print("Consider installing numba for compiled and parallelised methods.")
 
 
 if __name__ == "__main__":

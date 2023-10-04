@@ -257,7 +257,7 @@ class Satellite_SE2(gym.Env):
 
         # Draw the target orientation
         theta = self.target.get_state()
-        length = 3.0
+        length = scale/3
         end_x = length * np.sin(theta[0])
         end_y = length * np.cos(theta[0])
         self.ax.arrow(
@@ -265,8 +265,8 @@ class Satellite_SE2(gym.Env):
             0,
             end_x,
             end_y,
-            head_width=1,
-            head_length=2,
+            head_width=scale/3,
+            head_length=scale/2,
             color="red",
         )
 
@@ -279,48 +279,48 @@ class Satellite_SE2(gym.Env):
             s=50,
             label="Chaser",
         )
-
+       
         # Draw velocity vector of chaser
-        end_x = chaser_state[0] + chaser_state[3] * scale * 5e1
-        end_y = chaser_state[1] + chaser_state[4] * scale * 5e1
+        end_x = chaser_state[0] + chaser_state[3] * (scale * 10e1)
+        end_y = chaser_state[1] + chaser_state[4] * (scale * 10e1)
         self.ax.plot(
             [chaser_state[0], end_x],
             [chaser_state[1], end_y],
             color="green",
             label=f"V:{np.linalg.norm(chaser_state[3:5]):.2e}"
             + "\n"
-            + f"Vrot:{np.linalg.norm(chaser_state[5]):.2e}",
+            + f"Vrot:{(chaser_state[5]):.2e}",
         )
 
         # Draw orientation of chaser as a short line
-        length = scale
+        length = scale/4
         self.ax.arrow(
             chaser_state[0],
             chaser_state[1],
             length * np.sin(chaser_state[2]),
             length * np.cos(chaser_state[2]),
             color="blue",
-            head_width=1,
-            head_length=2,
+            head_width=scale/3,
+            head_length=scale/3,
         )
 
         # Draw the chaser fore vector
         chaser_control = self.chaser.get_control()
         if self.underactuated:
-            length = chaser_control[0] * 2e2 * scale
+            length = chaser_control[0] * 6e2 * scale
             end_x = chaser_state[0] + length * np.sin(chaser_state[2])
             end_y = chaser_state[1] + length * np.cos(chaser_state[2])
             self.ax.plot(
                 [chaser_state[0], end_x],
                 [chaser_state[1], end_y],
                 color="red",
-                label=f"F:{np.linalg.norm(chaser_control[0]):.2e}"
+                label=f"F:{(chaser_control[0]):.2e}"
                 + "\n"
-                + f"T:{np.linalg.norm(chaser_control[1]):.2e}",
+                + f"T:{(chaser_control[1]):.2e}",
             )
         else:
-            end_x = chaser_state[0] + 2e2 * scale * chaser_control[0]
-            end_y = chaser_state[1] + 2e2 * scale * chaser_control[1]
+            end_x = chaser_state[0] + 6e2 * scale * chaser_control[0]
+            end_y = chaser_state[1] + 6e2 * scale * chaser_control[1]
             self.ax.plot(
                 [chaser_state[0], end_x],
                 [chaser_state[1], chaser_state[1]],
@@ -330,11 +330,11 @@ class Satellite_SE2(gym.Env):
                 [chaser_state[0], chaser_state[0]],
                 [chaser_state[1], end_y],
                 color="red",
-                label=f"Fx:{np.linalg.norm(chaser_control[0]):.2e}"
+                label=f"Fx:{(chaser_control[0]):.2e}"
                 + "\n"
-                + f"Fy:{np.linalg.norm(chaser_control[1]):.2e}"
+                + f"Fy:{(chaser_control[1]):.2e}"
                 + "\n"
-                + f"T:{np.linalg.norm(chaser_control[2]):.2e}",
+                + f"T:{(chaser_control[2]):.2e}",
             )
 
         self.ax.plot([], color="blue", label=f"Rew: {self.__reward():.2e}")
@@ -583,6 +583,19 @@ class Satellite_SE2(gym.Env):
             pass
 
         # add dynamics later when speed is needed
+
+
+
+try:
+    from numba import jit_module
+
+    jit_module(nopython=True, error_model="numpy")
+    print("Using Numba optimised methods.")
+
+except ModuleNotFoundError:
+    print("Using native Python methods.")
+    print("Consider installing numba for compiled and parallelised methods.")
+
 
 
 def _test():
@@ -889,14 +902,14 @@ def _test8():
         ],
         dtype=np.float32,
     )
-    starting_state = np.zeros((8,))
-    starting_state[1] = 80
+    # starting_state = np.zeros((8,))
+    # starting_state[1] = 80
     env = Satellite_SE2(
         underactuated=True,
-        render_mode="rgb_array",
+        render_mode="human",
         max_action=1,  # set to 1 for nomal control
-        starting_state=starting_state,
-        starting_noise=np.zeros((8,)),
+        # sstarting_state=starting_state,
+        # sstarting_noise=np.zeros((8,)),
     )
     observation, info = env.reset()
     observations = [observation]
@@ -914,15 +927,15 @@ def _test8():
         if act_norm > FTMAX:
             action_full[0:2] = action_full[0:2] / act_norm * FTMAX
         ref_state = np.array(
-            [0, 0, np.arctan2(action_full[0], action_full[1]), 0, 0, 0],
+            [0, 0, np.arctan2(-action_full[0], -action_full[1]), 0, 0, 0],
             dtype=np.float32,
         )
         error = ref_state - env.chaser.get_state()
         action_under = [
-            np.linalg.norm(action_full[0:2]) / (1 + 10 * error[3] ** 2),
+            -np.linalg.norm(action_full[0:2]) / (1 + 10 * error[3] ** 2),
             np.clip(k[2, :] @ (error), -FTMAX, FTMAX),
         ]
-        if _ < 50000:
+        if _ < 500:
             action_under = [0, 0]
         observation, reward, term, trunc, info = env.step(action_under)
         actions.append(action_under)
@@ -949,17 +962,7 @@ def _scalene_profiler():
 
 
 
-try:
-    from numba import jit_module
-
-    jit_module(nopython=True, error_model="numpy")
-    print("Using Numba optimised methods.")
-
-except ModuleNotFoundError:
-    print("Using native Python methods.")
-    print("Consider installing numba for compiled and parallelised methods.")
-
 if __name__ == "__main__":
     from gymnasium.envs.registration import register
 
-    _test6()
+    _test8()

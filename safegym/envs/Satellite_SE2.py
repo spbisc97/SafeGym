@@ -1,11 +1,7 @@
 import gymnasium as gym
 from gymnasium import spaces
 import numpy as np
-from typing import (
-    Any,
-    Optional,
-    SupportsFloat,
-)
+from typing import Any, Optional, SupportsFloat, Tuple
 import matplotlib
 import matplotlib.pyplot as plt
 
@@ -18,9 +14,9 @@ MU = 3.986004418 * 10**14  # [m^3/s^2]
 RT = 6.6 * 1e6  # [m]
 NU = np.sqrt(MU / RT**3)
 FMAX = 1.05e-3  # [N]
-TMAX = 6e-3  # [Nm]
-FTMAX = 6e-3  # just to clip with the same value for
-STEP = 0.05  # [s]
+TMAX: np.float32 = np.float32(6e-3)  # [Nm]
+FTMAX: np.float32 = np.float32(6e-3)  # just to clip with the same value for
+STEP: np.float32 = np.float32(0.05)  # [s]
 
 VROT_MAX = 1  # [rad/s]
 VTRANS_MAX = 10  # [m/s]
@@ -73,10 +69,14 @@ class Satellite_SE2(gym.Env):
         self,
         render_mode: Optional[str] = None,
         underactuated: Optional[bool] = True,
-        starting_state: Optional[np.ndarray] = STARTING_STATE,
-        starting_noise: Optional[np.ndarray] = STARTING_NOISE,
+        starting_state: Optional[
+            np.ndarray[Tuple[int], np.dtype[np.float32]]
+        ] = STARTING_STATE,
+        starting_noise: Optional[
+            np.ndarray[Tuple[int], np.dtype[np.float32]]
+        ] = STARTING_NOISE,
         unit_action_space: Optional[bool] = True,
-        max_action=FTMAX,
+        max_action: np.float32 = FTMAX,
     ):
         super(Satellite_SE2, self).__init__()
         assert isinstance(underactuated, bool)
@@ -114,7 +114,9 @@ class Satellite_SE2(gym.Env):
         self, *, seed: int | None = None, options: dict[str, Any] | None = None
     ) -> tuple[Any, dict[str, Any]]:
         super().reset(seed=seed, options=options)
-        random_state = self.__generate_random_state()
+        random_state: np.ndarray[tuple[int], np.dtype[np.float32]] = (
+            self.__generate_random_state()
+        )
         # set a not really stable initial traejctory
         chaser_stable_random = np.hstack(
             (
@@ -129,7 +131,9 @@ class Satellite_SE2(gym.Env):
 
         self.chaser.reset(chaser_stable_random)
         for _ in range(np.random.randint(10, 5000)):
-            self.chaser.step(0.5)  # roughly integration to move the object
+            self.chaser.step(
+                np.float32(0.5)
+            )  # roughly integration to move the object
 
         self.target.reset(random_state[6:8])
         observation = self.__get_observation()
@@ -141,7 +145,7 @@ class Satellite_SE2(gym.Env):
         self, action: np.ndarray
     ) -> tuple[Any, float, bool, bool, dict[str, Any]]:
         if not self.action_space.contains(action):
-            raise f"{action!r} ({type(action)}) invalid"
+            raise Exception(f"{action!r} ({type(action)}) invalid")
         self.chaser.set_control(self.__action_filter(action))
         self.chaser.step()
         self.time_step += 1  # Increment the time_step at each step.
@@ -155,7 +159,7 @@ class Satellite_SE2(gym.Env):
 
         return observation, reward, terminated, truncated, info
 
-    def render(self, observationlist: np.ndarray = None):
+    def render(self):
         """Render the environment."""
         if self.render_mode == "human":
             if self.fig is None or self.ax is None:
@@ -240,7 +244,7 @@ class Satellite_SE2(gym.Env):
             self.__draw_satellite()
             self.fig.canvas.draw()
             img = np.array(
-                self.fig.canvas.renderer.buffer_rgba()
+                self.fig.canvas.renderer.buffer_rgba()  # type: ignore
             )  # Get the RGBA buffer
             data = img[:, :, :3]  # Drop the alpha channel to get RGB
 
@@ -248,6 +252,8 @@ class Satellite_SE2(gym.Env):
         return
 
     def __draw_satellite(self):
+        if self.fig is None or self.ax is None:
+            return
         # Clear the axis for new drawings
         self.ax.clear()
         scale = self.xylim / 10
@@ -381,7 +387,12 @@ class Satellite_SE2(gym.Env):
         return state
 
     def __generate_random_state(self):
-        state = np.random.normal(self.starting_state, self.starting_noise)
+        state: np.ndarray[tuple[int], np.dtype[np.float32]]
+        state = np.random.normal(
+            self.starting_state,
+            self.starting_noise,
+            size=(8,),
+        ).astype(np.float32)
         return state
 
     def __reward(self):
@@ -439,9 +450,14 @@ class Satellite_SE2(gym.Env):
     class Chaser:
         """Chaser class for the satellite environment."""
 
-        def __init__(self, step=STEP, state=None, underactuated=True):
-            self.state = None
-
+        def __init__(
+            self,
+            step: np.float32 = STEP,
+            state: Optional[
+                np.ndarray[tuple[int], np.dtype[np.float32]]
+            ] = None,
+            underactuated: bool = True,
+        ):
             if state is None:
                 self.set_state()
             else:
@@ -467,15 +483,18 @@ class Satellite_SE2(gym.Env):
             self.state = np.float32(state)
             return
 
-        def set_control(self, control: np.ndarray = None):
+        def set_control(
+            self,
+            control: np.ndarray[tuple[int], np.dtype[np.float32]],
+        ):
             self.control = np.float32(control)
             return
 
-        def get_state(self):
-            return self.state
+        def get_state(self) -> np.ndarray[tuple[int], np.dtype[np.float32]]:
+            return np.array(self.state)
 
-        def get_control(self):
-            return self.control
+        def get_control(self) -> np.ndarray[tuple[int], np.dtype[np.float32]]:
+            return np.array(self.control)
 
         def __sat_dyn_underactuated(
             self,
@@ -526,8 +545,10 @@ class Satellite_SE2(gym.Env):
 
         def step(self, ts=STEP):
             t = np.zeros((1,), dtype=np.float32)
-            w = self.get_state()
-            u = self.get_control()
+            w: np.ndarray[tuple[int], np.dtype[np.float32]] = self.get_state()
+            u: np.ndarray[tuple[int], np.dtype[np.float32]] = (
+                self.get_control()
+            )
             k1 = self.__sat_dyn(t, w, u)
             self.set_state(w + ts * (k1))
             return self.state
@@ -549,11 +570,13 @@ class Satellite_SE2(gym.Env):
         def render(self):
             pass
 
-        def radius(self):
-            return np.linalg.norm(self.state[0:2])
+        def radius(self) -> np.float32:
+            state = np.array(self.state)
+            return np.linalg.norm(state[0:2]).astype(np.float32)
 
-        def speed(self):
-            return np.linalg.norm(self.state[3:5])
+        def speed(self) -> np.float32:
+            state = np.array(self.state)
+            return np.linalg.norm(state[3:5]).astype(np.float32)
 
         def symbolic_dynamics(self):
             pass
@@ -567,13 +590,16 @@ class Satellite_SE2(gym.Env):
             return
 
         def set_state(
-            self, state: np.array = np.zeros((2,), dtype=np.float32)
+            self,
+            state: np.ndarray[Tuple[int], np.dtype[np.float32]] = np.zeros(
+                (2,), dtype=np.float32
+            ),
         ):
             self.state = np.float32(state)
             return
 
-        def get_state(self):
-            return self.state
+        def get_state(self) -> np.ndarray[Tuple[int], np.dtype[np.float32]]:
+            return np.array(self.state, dtype=np.float32)
 
         def reset(self, state=np.zeros((2,), dtype=np.float32)):
             self.set_state(state)
@@ -608,7 +634,7 @@ def _test2(underactuated=True):
         underactuated=underactuated,
         render_mode="human",
         starting_state=np.array([0, 10, 0, 0, 0, 0, 0, 0], dtype=np.float32),
-        starting_noise=np.zeros((8,)),
+        starting_noise=np.zeros((8,), dtype=np.float32),
     )
     observation, info = env.reset()
     observations = [observation]
@@ -929,10 +955,13 @@ def _test8():
             dtype=np.float32,
         )
         error = ref_state - env.chaser.get_state()
-        action_under = [
-            -np.linalg.norm(action_full[0:2]) / (1 + 10 * error[3] ** 2),
-            np.clip(k[2, :] @ (error), -FTMAX, FTMAX),
-        ]
+        action_under = np.array(
+            [
+                -np.linalg.norm(action_full[0:2]) / (1 + 10 * error[3] ** 2),
+                np.clip(k[2, :] @ (error), -FTMAX, FTMAX),
+            ],
+            dtype=np.float32,
+        )
         # if _ < 1:
         #     action_under = [0, 0]
         observation, reward, term, trunc, info = env.step(action_under)

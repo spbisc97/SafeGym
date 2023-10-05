@@ -32,7 +32,7 @@ XY_PLOT_MAX = 1000  # [m]
 
 STARTING_STATE = np.array([0, 0, 0, 0, 0, 0, 0, 0], dtype=np.float32)
 
-STARTING_NOISE = np.array([10, 10, np.pi / 2, 1e-6, 1e-6, 1e-6, 0, 0])
+STARTING_NOISE = np.array([20, 20, np.pi / 2, 1e-6, 1e-6, 1e-6, 0, 0])
 
 EULER_SPEEDUP = True
 
@@ -257,7 +257,7 @@ class Satellite_SE2(gym.Env):
 
         # Draw the target orientation
         theta = self.target.get_state()
-        length = scale/3
+        length = scale / 3
         end_x = length * np.sin(theta[0])
         end_y = length * np.cos(theta[0])
         self.ax.arrow(
@@ -265,8 +265,8 @@ class Satellite_SE2(gym.Env):
             0,
             end_x,
             end_y,
-            head_width=scale/3,
-            head_length=scale/2,
+            head_width=scale / 3,
+            head_length=scale / 2,
             color="red",
         )
 
@@ -279,10 +279,10 @@ class Satellite_SE2(gym.Env):
             s=50,
             label="Chaser",
         )
-       
+
         # Draw velocity vector of chaser
-        end_x = chaser_state[0] + chaser_state[3] * (scale * 10e1)
-        end_y = chaser_state[1] + chaser_state[4] * (scale * 10e1)
+        end_x = chaser_state[0] + chaser_state[3] * (scale * 15e1)
+        end_y = chaser_state[1] + chaser_state[4] * (scale * 15e1)
         self.ax.plot(
             [chaser_state[0], end_x],
             [chaser_state[1], end_y],
@@ -293,21 +293,21 @@ class Satellite_SE2(gym.Env):
         )
 
         # Draw orientation of chaser as a short line
-        length = scale/4
+        length = scale / 4
         self.ax.arrow(
             chaser_state[0],
             chaser_state[1],
             length * np.sin(chaser_state[2]),
             length * np.cos(chaser_state[2]),
             color="blue",
-            head_width=scale/3,
-            head_length=scale/3,
+            head_width=scale / 3,
+            head_length=scale / 3,
         )
 
         # Draw the chaser fore vector
         chaser_control = self.chaser.get_control()
         if self.underactuated:
-            length = chaser_control[0] * 6e2 * scale
+            length = chaser_control[0] * 1e3 * scale
             end_x = chaser_state[0] + length * np.sin(chaser_state[2])
             end_y = chaser_state[1] + length * np.cos(chaser_state[2])
             self.ax.plot(
@@ -385,16 +385,16 @@ class Satellite_SE2(gym.Env):
         return state
 
     def __reward(self):
-        reward = 0.5
+        reward = 0
         ch_radius = self.chaser.radius()
         ch_control = self.chaser.get_control()
         ch_speed = self.chaser.speed()
         ch_state = self.chaser.get_state()
 
         reward += (
-            (-np.log10(ch_radius + 0.9))
-            - (np.linalg.norm(ch_control) * 5)
-            - (np.log10(ch_speed + 1))  # chaser speed
+            (-np.log10(ch_radius + 0.1))
+            - (np.linalg.norm(ch_control))
+            - (np.log10(ch_speed + 1))  # chaser abs speed
             - np.linalg.norm(ch_state[5])  # angular velocity
         )
         return reward
@@ -585,7 +585,6 @@ class Satellite_SE2(gym.Env):
         # add dynamics later when speed is needed
 
 
-
 try:
     from numba import jit_module
 
@@ -595,7 +594,6 @@ try:
 except ModuleNotFoundError:
     print("Using native Python methods.")
     print("Consider installing numba for compiled and parallelised methods.")
-
 
 
 def _test():
@@ -860,14 +858,14 @@ def _test6():
         observation, reward, term, trunc, info = env.step(action)
         observations.append(observation)
         rewards.append(reward)
-        if _ % 50 == 0:
+        if _ % 100 == 0:
             frames.append(env.render())
     env.close()
     plt.plot(rewards)
     plt.show()
-    clip = ImageSequenceClip(frames, fps=100)
+    clip = ImageSequenceClip(frames, fps=50)
     save_path = "./video_fully_lqr.mp4"
-    clip.write_videofile(save_path, fps=100)
+    clip.write_videofile(save_path, fps=50)
 
 
 def _test8():
@@ -902,13 +900,13 @@ def _test8():
         ],
         dtype=np.float32,
     )
-    # starting_state = np.zeros((8,))
-    # starting_state[1] = 80
+    starting_state = np.zeros((8,))
+    starting_state[1] = 20
     env = Satellite_SE2(
         underactuated=True,
-        render_mode="human",
+        render_mode="rgb_array",
         max_action=1,  # set to 1 for nomal control
-        # sstarting_state=starting_state,
+        starting_state=starting_state,
         # sstarting_noise=np.zeros((8,)),
     )
     observation, info = env.reset()
@@ -920,7 +918,7 @@ def _test8():
     action_under = np.array([0, 0], dtype=np.float32)
     env.action_space.sample()
     print(env.action_space.sample())
-    for _ in range(100000):
+    for _ in range(50000):
         state = env.chaser.get_state()
         action_full = -k @ env.chaser.get_state()
         act_norm = np.linalg.norm(action_full[0:2])
@@ -935,20 +933,20 @@ def _test8():
             -np.linalg.norm(action_full[0:2]) / (1 + 10 * error[3] ** 2),
             np.clip(k[2, :] @ (error), -FTMAX, FTMAX),
         ]
-        if _ < 500:
-            action_under = [0, 0]
+        # if _ < 1:
+        #     action_under = [0, 0]
         observation, reward, term, trunc, info = env.step(action_under)
         actions.append(action_under)
         observations.append(observation)
         rewards.append(reward)
-        if _ % 50 == 0:
+        if _ % 100 == 0:
             frames.append(env.render())
 
     env.close()
 
-    clip = ImageSequenceClip(frames, fps=100)
+    clip = ImageSequenceClip(frames, fps=50)
     save_path = "./video_under_lqr.mp4"
-    clip.write_videofile(save_path, fps=100)
+    clip.write_videofile(save_path, fps=50)
     plt.plot(actions)
     plt.show()
 
@@ -959,7 +957,6 @@ def _scalene_profiler():
     scalene_profiler.start()
     _test6()
     scalene_profiler.stop()
-
 
 
 if __name__ == "__main__":

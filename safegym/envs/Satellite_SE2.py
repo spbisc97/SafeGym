@@ -33,7 +33,7 @@ STARTING_NOISE = np.array([20, 20, np.pi / 2, 1e-6, 1e-6, 1e-6, 0, 0])
 EULER_SPEEDUP = True
 
 
-class Satellite_SE2(gym.Env):
+class Satellite_SE2(gym.Env):# type: ignore
     """
     A gym environment for simulating the motion of a satellite in 2D space.
 
@@ -361,7 +361,7 @@ class Satellite_SE2(gym.Env):
             plt.close(self.fig)
         return
 
-    def __get_observation(self) -> np.ndarray:
+    def __get_observation(self) -> np.ndarray[tuple[int], np.dtype[np.float32]]:
         w = self.chaser.get_state()
         theta = self.target.get_state()
         observation = np.zeros((10,), dtype=np.float32)
@@ -379,7 +379,7 @@ class Satellite_SE2(gym.Env):
 
         return observation
 
-    def __get_state(self) -> np.ndarray:
+    def __get_state(self) -> np.ndarray[tuple[int], np.dtype[np.float32]]:
         w = self.chaser.get_state()
         theta = self.target.get_state()
         state = np.zeros((10,), dtype=np.float32)
@@ -479,7 +479,7 @@ class Satellite_SE2(gym.Env):
                 # would slow down the code
             return
 
-        def set_state(self, state=np.zeros((6,), dtype=np.float32)):
+        def set_state(self, state:np.ndarray[tuple[int],np.dtype[np.float32] ]=np.zeros((6,), dtype=np.float32)):
             self.state = np.float32(state)
             return
 
@@ -499,8 +499,8 @@ class Satellite_SE2(gym.Env):
         def __sat_dyn_underactuated(
             self,
             t: SupportsFloat,
-            w: np.ndarray,
-            u: np.ndarray,
+            w: np.ndarray[tuple[int], np.dtype[np.float32]],
+            u: np.ndarray[tuple[int], np.dtype[np.float32]],
         ):
             # u = [fx, tau]
 
@@ -525,8 +525,8 @@ class Satellite_SE2(gym.Env):
         def __sat_dyn_fullyactuated(
             self,
             t: SupportsFloat,
-            w: np.ndarray,
-            u: np.ndarray,
+            w: np.ndarray[tuple[int], np.dtype[np.float32]],
+            u: np.ndarray[tuple[int], np.dtype[np.float32]],
         ):
             # u = [fx, fu, tau]
 
@@ -543,7 +543,7 @@ class Satellite_SE2(gym.Env):
             dw[5] = INERTIA_INV * u[2]
             return dw
 
-        def step(self, ts=STEP):
+        def step(self, ts:np.float32=STEP):
             t = np.zeros((1,), dtype=np.float32)
             w: np.ndarray[tuple[int], np.dtype[np.float32]] = self.get_state()
             u: np.ndarray[tuple[int], np.dtype[np.float32]] = (
@@ -559,7 +559,7 @@ class Satellite_SE2(gym.Env):
             # self.set_state(w + ts * (k1 + 2 * k2 + 2 * k3 + k4) / 6)
             # return self.state
 
-        def reset(self, state=np.zeros((6,), dtype=np.float32)):
+        def reset(self, state:np.ndarray[tuple[int],np.dtype[np.float32]]=np.zeros((6,), dtype=np.float32)):
             self.set_state(state)
             if self.underactuated is True:
                 self.set_control(np.zeros((2,), dtype=np.float32))
@@ -583,7 +583,7 @@ class Satellite_SE2(gym.Env):
 
     class Target:
         # add dynamics later
-        def __init__(self, step=STEP, state=np.zeros((2,), dtype=np.float32)):
+        def __init__(self, step: np.float32=STEP, state:np.ndarray[tuple[int],np.dtype[np.float32]]=np.zeros((2,), dtype=np.float32)):
             # state = [theta,theta_dot]
             self.state = state
             self.set_state(state)
@@ -601,7 +601,7 @@ class Satellite_SE2(gym.Env):
         def get_state(self) -> np.ndarray[Tuple[int], np.dtype[np.float32]]:
             return np.array(self.state, dtype=np.float32)
 
-        def reset(self, state=np.zeros((2,), dtype=np.float32)):
+        def reset(self, state:np.ndarray[tuple[int],np.dtype[np.float32]]=np.zeros((2,), dtype=np.float32)):
             self.set_state(state)
             return self.state
 

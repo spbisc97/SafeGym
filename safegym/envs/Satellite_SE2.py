@@ -26,10 +26,10 @@ XY_MAX = 1000  # [m]
 
 XY_PLOT_MAX = 1000  # [m]
 
+y0 = 5  # [m]
+STARTING_STATE = np.array([0, y0, 0, y0 / 2000, 0, 0, 0, 0], dtype=np.float32)
 
-STARTING_STATE = np.array([0, 0, 0, 0, 0, 0, 0, 0], dtype=np.float32)
-
-STARTING_NOISE = np.array([20, 20, np.pi / 2, 1e-6, 1e-6, 1e-6, 0, 0])
+STARTING_NOISE = np.array([0, 0, 0, 0, 0, 0, 0, 0])
 
 EULER_SPEEDUP = True
 
@@ -62,7 +62,12 @@ class Satellite_SE2(gym.Env):  # type: ignore
     """
 
     metadata = {
-        "render_modes": ["human", "graph", "rgb_array", None],
+        "render_modes": [
+            "human",
+            "graph",
+            "rgb_array",
+            "rgb_array_graph",
+        ],
         "render_fps": 1000,
     }
 
@@ -90,6 +95,9 @@ class Satellite_SE2(gym.Env):  # type: ignore
         self.max_action = max_action
         self.starting_state = starting_state
         self.starting_noise = starting_noise
+        assert (
+            render_mode in self.metadata["render_modes"] or render_mode is None
+        )
         self.render_mode = render_mode
         self.__step = step
         # Added fix and axes for rendering
@@ -99,6 +107,7 @@ class Satellite_SE2(gym.Env):  # type: ignore
         # Added lists for storing historical data plotting
         self.state_history = []
         self.action_history = []
+        self.reward_history = []
         self.time_step = 0
 
         self.build_action_space()
@@ -161,6 +170,7 @@ class Satellite_SE2(gym.Env):  # type: ignore
         info = {}
         self.action_history.append(self.chaser.get_control())
         self.state_history.append(self.__get_state())
+        self.reward_history.append(reward)
         if self.render_mode in ["human", "graph"]:
             self.render()  # Update the rendering after every action
 
@@ -417,6 +427,23 @@ class Satellite_SE2(gym.Env):  # type: ignore
         ch_control = self.chaser.get_control()
         ch_speed = self.chaser.speed()
         ch_state = self.chaser.get_state()
+
+        reward += (
+            (-np.log10(ch_radius + 0.1))
+            - (np.linalg.norm(ch_control))
+            - (np.log10(ch_speed + 1))  # chaser abs speed
+            - np.linalg.norm(ch_state[5])  # angular velocity
+        )
+        return reward
+
+    def _reward_shaping(self):
+        reward = 0
+        ch_radius = self.chaser.radius()
+        ch_control = self.chaser.get_control()
+        ch_speed = self.chaser.speed()
+        ch_state = self.chaser.get_state()
+        reward += np.linalg.norm(ch_control) / (FTMAX * 3)  # chaser abs speed
+        reward += np.linalg.norm(ch_state[5])  # angular velocity
 
         reward += (
             (-np.log10(ch_radius + 0.1))

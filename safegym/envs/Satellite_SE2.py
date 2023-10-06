@@ -156,7 +156,7 @@ class Satellite_SE2(gym.Env):  # type: ignore
         self.time_step += 1  # Increment the time_step at each step.
         terminated = False  # self.__termination()
         truncated = False
-        reward = self.__reward()
+        reward = self._reward_function()
         observation = self.__get_observation()
         info = {}
         self.action_history.append(self.chaser.get_control())
@@ -355,7 +355,9 @@ class Satellite_SE2(gym.Env):  # type: ignore
                 + f"T:{(chaser_control[2]):.2e}",
             )
 
-        self.ax.plot([], color="blue", label=f"Rew: {self.__reward():.2e}")
+        self.ax.plot(
+            [], color="blue", label=f"Rew: {self._reward_function():.2e}"
+        )
 
         # Legend, grid, and title
         self.ax.legend()
@@ -409,7 +411,7 @@ class Satellite_SE2(gym.Env):  # type: ignore
         ).astype(np.float32)
         return state
 
-    def __reward(self):
+    def _reward_function(self):
         reward = 0
         ch_radius = self.chaser.radius()
         ch_control = self.chaser.get_control()

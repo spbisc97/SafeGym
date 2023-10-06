@@ -56,6 +56,6 @@ register(
 register(
     id="Satellite-SE2-v0",
     entry_point="safegym.envs.Satellite_SE2:Satellite_SE2",
-    max_episode_steps=600_000,
-    reward_threshold=0.0,
+    max_episode_steps=100_000,
+    reward_threshold=100_000,
 )

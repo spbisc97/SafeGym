@@ -4,6 +4,7 @@ import numpy as np
 from typing import Any, Optional, SupportsFloat, Tuple
 import matplotlib
 import matplotlib.pyplot as plt
+import warnings
 
 matplotlib.rcParams["figure.raise_window"] = False
 
@@ -77,6 +78,7 @@ class Satellite_SE2(gym.Env):  # type: ignore
         ] = STARTING_NOISE,
         unit_action_space: Optional[bool] = True,
         max_action: np.float32 = FTMAX,
+        step: np.float32 = STEP,
     ):
         super(Satellite_SE2, self).__init__()
         assert isinstance(underactuated, bool)
@@ -89,6 +91,7 @@ class Satellite_SE2(gym.Env):  # type: ignore
         self.starting_state = starting_state
         self.starting_noise = starting_noise
         self.render_mode = render_mode
+        self.__step = step
         # Added fix and axes for rendering
         self.fig = None
         self.ax = None
@@ -104,7 +107,9 @@ class Satellite_SE2(gym.Env):  # type: ignore
             low=-np.inf, high=np.inf, shape=(10,), dtype=np.float32
         )
         self.steps_beyond_done = None
-        self.chaser = self.Chaser(underactuated=underactuated)
+        self.chaser = self.Chaser(
+            underactuated=underactuated, step=self.__step
+        )
         self.target = self.Target()
         self.reset()
 
@@ -454,12 +459,13 @@ class Satellite_SE2(gym.Env):  # type: ignore
 
         def __init__(
             self,
-            step: np.float32 = STEP,
+            step: np.float32,
             state: Optional[
                 np.ndarray[tuple[int], np.dtype[np.float32]]
             ] = None,
             underactuated: bool = True,
         ):
+            self.__step = step
             if state is None:
                 self.set_state()
             else:
@@ -479,6 +485,18 @@ class Satellite_SE2(gym.Env):  # type: ignore
                 self.control_space = 3  # avoid gym space check
                 # would be nice to have a check control space each time but
                 # would slow down the code
+
+            if EULER_SPEEDUP and self.__step < 0.1:
+                self.step = self.euler_step
+            else:
+                self.step = self.rk4_step
+
+            if self.__step > 0.5:
+                warnings.warn(
+                    "Step size is too large for the dynamics to be stable."
+                    " Consider using a smaller step size."
+                )
+
             return
 
         def set_state(
@@ -550,7 +568,8 @@ class Satellite_SE2(gym.Env):  # type: ignore
             dw[5] = INERTIA_INV * u[2]
             return dw
 
-        def step(self, ts: np.float32 = STEP):
+        def euler_step(self):
+            ts: np.float32 = self.__step
             t = np.zeros((1,), dtype=np.float32)
             w: np.ndarray[tuple[int], np.dtype[np.float32]] = self.get_state()
             u: np.ndarray[tuple[int], np.dtype[np.float32]] = (
@@ -560,11 +579,19 @@ class Satellite_SE2(gym.Env):  # type: ignore
             self.set_state(w + ts * (k1))
             return self.state
 
-            # k2 = self.__sat_dyn(t + 0.5 * ts, w + 0.5 * ts * k1, u)
-            # k3 = self.__sat_dyn(t + 0.5 * ts, w + 0.5 * ts * k2, u)
-            # k4 = self.__sat_dyn(t + ts, w + ts * k3, u)
-            # self.set_state(w + ts * (k1 + 2 * k2 + 2 * k3 + k4) / 6)
-            # return self.state
+        def rk4_step(self):
+            ts: np.float32 = self.__step
+            t = np.zeros((1,), dtype=np.float32)
+            w: np.ndarray[tuple[int], np.dtype[np.float32]] = self.get_state()
+            u: np.ndarray[tuple[int], np.dtype[np.float32]] = (
+                self.get_control()
+            )
+            k1 = self.__sat_dyn(t, w, u)
+            k2 = self.__sat_dyn(t + 0.5 * ts, w + 0.5 * ts * k1, u)
+            k3 = self.__sat_dyn(t + 0.5 * ts, w + 0.5 * ts * k2, u)
+            k4 = self.__sat_dyn(t + ts, w + ts * k3, u)
+            self.set_state(w + ts * (k1 + 2 * k2 + 2 * k3 + k4) / 6)
+            return self.state
 
         def reset(
             self,

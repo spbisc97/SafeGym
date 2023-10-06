@@ -33,7 +33,7 @@ STARTING_NOISE = np.array([20, 20, np.pi / 2, 1e-6, 1e-6, 1e-6, 0, 0])
 EULER_SPEEDUP = True
 
 
-class Satellite_SE2(gym.Env):# type: ignore
+class Satellite_SE2(gym.Env):  # type: ignore
     """
     A gym environment for simulating the motion of a satellite in 2D space.
 
@@ -114,28 +114,28 @@ class Satellite_SE2(gym.Env):# type: ignore
         self, *, seed: int | None = None, options: dict[str, Any] | None = None
     ) -> tuple[Any, dict[str, Any]]:
         super().reset(seed=seed, options=options)
-        random_state: np.ndarray[tuple[int], np.dtype[np.float32]] = (
-            self.__generate_random_state()
+        state: np.ndarray[tuple[int], np.dtype[np.float32]] = (
+            self.__state_generator()
         )
         # set a not really stable initial traejctory
-        chaser_stable_random = np.hstack(
-            (
-                0,
-                random_state[1],
-                random_state[2],
-                random_state[1] / 2000,
-                0,  # random_state[0] * 2e-3,
-                random_state[5],
-            )
-        )
+        # chaser_stable_random = np.hstack(
+        #     (
+        #         0,
+        #         random_state[1],
+        #         random_state[2],
+        #         random_state[1] / 2000,
+        #         0,  # random_state[0] * 2e-3,
+        #         random_state[5],
+        #     )
+        # )
 
-        self.chaser.reset(chaser_stable_random)
-        for _ in range(np.random.randint(10, 5000)):
-            self.chaser.step(
-                np.float32(0.5)
-            )  # roughly integration to move the object
+        self.chaser.reset(state)
+        # for _ in range(np.random.randint(10, 5000)):
+        #     self.chaser.step(
+        #         np.float32(0.5)
+        #     )  # roughly integration to move the object
 
-        self.target.reset(random_state[6:8])
+        self.target.reset(state[6:8])
         observation = self.__get_observation()
         self.xylim = self.chaser.radius() * 2
         info = {}
@@ -361,7 +361,9 @@ class Satellite_SE2(gym.Env):# type: ignore
             plt.close(self.fig)
         return
 
-    def __get_observation(self) -> np.ndarray[tuple[int], np.dtype[np.float32]]:
+    def __get_observation(
+        self,
+    ) -> np.ndarray[tuple[int], np.dtype[np.float32]]:
         w = self.chaser.get_state()
         theta = self.target.get_state()
         observation = np.zeros((10,), dtype=np.float32)
@@ -386,7 +388,7 @@ class Satellite_SE2(gym.Env):# type: ignore
         state = np.concatenate((w, theta))
         return state
 
-    def __generate_random_state(self):
+    def __state_generator(self):
         state: np.ndarray[tuple[int], np.dtype[np.float32]]
         state = np.random.normal(
             self.starting_state,
@@ -479,7 +481,12 @@ class Satellite_SE2(gym.Env):# type: ignore
                 # would slow down the code
             return
 
-        def set_state(self, state:np.ndarray[tuple[int],np.dtype[np.float32] ]=np.zeros((6,), dtype=np.float32)):
+        def set_state(
+            self,
+            state: np.ndarray[tuple[int], np.dtype[np.float32]] = np.zeros(
+                (6,), dtype=np.float32
+            ),
+        ):
             self.state = np.float32(state)
             return
 
@@ -543,7 +550,7 @@ class Satellite_SE2(gym.Env):# type: ignore
             dw[5] = INERTIA_INV * u[2]
             return dw
 
-        def step(self, ts:np.float32=STEP):
+        def step(self, ts: np.float32 = STEP):
             t = np.zeros((1,), dtype=np.float32)
             w: np.ndarray[tuple[int], np.dtype[np.float32]] = self.get_state()
             u: np.ndarray[tuple[int], np.dtype[np.float32]] = (
@@ -559,7 +566,12 @@ class Satellite_SE2(gym.Env):# type: ignore
             # self.set_state(w + ts * (k1 + 2 * k2 + 2 * k3 + k4) / 6)
             # return self.state
 
-        def reset(self, state:np.ndarray[tuple[int],np.dtype[np.float32]]=np.zeros((6,), dtype=np.float32)):
+        def reset(
+            self,
+            state: np.ndarray[tuple[int], np.dtype[np.float32]] = np.zeros(
+                (6,), dtype=np.float32
+            ),
+        ):
             self.set_state(state)
             if self.underactuated is True:
                 self.set_control(np.zeros((2,), dtype=np.float32))
@@ -583,7 +595,13 @@ class Satellite_SE2(gym.Env):# type: ignore
 
     class Target:
         # add dynamics later
-        def __init__(self, step: np.float32=STEP, state:np.ndarray[tuple[int],np.dtype[np.float32]]=np.zeros((2,), dtype=np.float32)):
+        def __init__(
+            self,
+            step: np.float32 = STEP,
+            state: np.ndarray[tuple[int], np.dtype[np.float32]] = np.zeros(
+                (2,), dtype=np.float32
+            ),
+        ):
             # state = [theta,theta_dot]
             self.state = state
             self.set_state(state)
@@ -601,7 +619,12 @@ class Satellite_SE2(gym.Env):# type: ignore
         def get_state(self) -> np.ndarray[Tuple[int], np.dtype[np.float32]]:
             return np.array(self.state, dtype=np.float32)
 
-        def reset(self, state:np.ndarray[tuple[int],np.dtype[np.float32]]=np.zeros((2,), dtype=np.float32)):
+        def reset(
+            self,
+            state: np.ndarray[tuple[int], np.dtype[np.float32]] = np.zeros(
+                (2,), dtype=np.float32
+            ),
+        ):
             self.set_state(state)
             return self.state
 
@@ -723,11 +746,11 @@ def _test3(underactuated=True):
 
 def _test4():
     # check just the dynamics
-    starting_state = np.zeros((8,))
+    starting_state = np.zeros((8,), dtype=np.float32)
     starting_state[1] = 30
     env = Satellite_SE2(
         render_mode=None,
-        starting_noise=np.zeros((8,)),
+        starting_noise=np.zeros((8,), dtype=np.float32),
         starting_state=starting_state,
     )
     observation, info = env.reset()
@@ -783,15 +806,15 @@ def _test5():
     )
 
     # check just the dynamicsstarting_state = np.zeros((8,))
-    starting_state = np.zeros((8,))
+    starting_state = np.zeros((8,), dtype=np.float32)
     starting_state[1] = 30
 
     env = Satellite_SE2(
         underactuated=False,
         render_mode="rgb_array",
-        max_action=1,  # set to 1 for nomal control
+        max_action=np.float32(1),  # set to 1 for nomal control
         starting_state=starting_state,
-        starting_noise=np.zeros((8,)),
+        starting_noise=np.zeros((8,), dtype=np.float32),
     )
     # env = HumanRenderingV0(env)
     # env = RecordVideoV0(env, video_folder=".", video_length=0)
@@ -807,7 +830,7 @@ def _test5():
         action = -k @ env.chaser.get_state()
 
         if np.linalg.norm(action) > 1:
-            action = action / np.norm(action)
+            action = action / np.linalg.norm(action)
         observation, reward, term, trunc, info = env.step(action)
         if _ % 50 == 0:
             frames.append(env.render())
@@ -858,14 +881,14 @@ def _test6():
         ],
         dtype=np.float32,
     )
-    starting_state = np.zeros((8,))
+    starting_state = np.zeros((8,), dtype=np.float32)
     starting_state[1] = 60
     env = Satellite_SE2(
         underactuated=False,
         render_mode=None,
-        max_action=1,  # set to 1 for nomal control
+        max_action=np.float32(1),  # set to 1 for nomal control
         starting_state=starting_state,
-        starting_noise=np.zeros((8,)),
+        starting_noise=np.zeros((8,), dtype=np.float32),
     )
     observation, info = env.reset()
     observations = [observation]
@@ -880,7 +903,7 @@ def _test6():
         if act_norm > FTMAX:
             action[0:2] = action[0:2] / act_norm * FTMAX
         if _ < 50000:
-            action = [0, 0, 0]
+            action = np.array([0, 0, 0], dtype=np.float32)
         observation, reward, term, trunc, info = env.step(action)
         observations.append(observation)
         rewards.append(reward)
@@ -926,12 +949,12 @@ def _test8():
         ],
         dtype=np.float32,
     )
-    starting_state = np.zeros((8,))
+    starting_state = np.zeros((8,), dtype=np.float32)
     starting_state[1] = 20
     env = Satellite_SE2(
         underactuated=True,
         render_mode="rgb_array",
-        max_action=1,  # set to 1 for nomal control
+        max_action=np.float32(1),  # set to 1 for nomal control
         starting_state=starting_state,
         # sstarting_noise=np.zeros((8,)),
     )

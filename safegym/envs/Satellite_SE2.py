@@ -129,7 +129,7 @@ class Satellite_SE2(gym.Env):  # type: ignore
         #     )
         # )
 
-        self.chaser.reset(state)
+        self.chaser.reset(state[0:6])
         # for _ in range(np.random.randint(10, 5000)):
         #     self.chaser.step(
         #         np.float32(0.5)
@@ -487,7 +487,7 @@ class Satellite_SE2(gym.Env):  # type: ignore
                 (6,), dtype=np.float32
             ),
         ):
-            self.state = np.float32(state)
+            self.state = state
             return
 
         def set_control(

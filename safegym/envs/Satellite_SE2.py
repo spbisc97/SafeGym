@@ -159,6 +159,8 @@ class Satellite_SE2(gym.Env):  # type: ignore
         reward = self.__reward()
         observation = self.__get_observation()
         info = {}
+        self.action_history.append(self.chaser.get_control())
+        self.state_history.append(self.__get_state())
         if self.render_mode in ["human", "graph"]:
             self.render()  # Update the rendering after every action
 
@@ -183,59 +185,14 @@ class Satellite_SE2(gym.Env):  # type: ignore
             plt.pause(0.00001)  # Pause to show frame
 
         if self.render_mode == "graph":
-            self.state_history.append(self.__get_state())
-            self.action_history.append(self.chaser.get_control())
-
-            if False:  # if np.size(self.action_history, 1) % 2 == 0:
-                return
+            # if False:  # if np.size(self.action_history, 1) % 2 == 0:
+            # return
 
             if self.fig is None or self.axs is None:
                 self.fig, self.axs = plt.subplots(5, 1, figsize=(10, 15))
                 plt.ion()  # Turn on interactive mode
 
-            for ax in self.axs:
-                ax.clear()
-
-            # State history to numpy array
-            state_history = np.array(self.state_history)
-
-            # Plot positions
-            self.axs[0].plot(state_history[:, 0], label="x position")
-            self.axs[0].plot(state_history[:, 1], label="y position")
-            self.axs[0].set_ylabel("Position")
-            self.axs[0].legend(loc="upper right")
-
-            # Plot velocities
-            self.axs[1].plot(state_history[:, 2], label="x velocity")
-            self.axs[1].plot(state_history[:, 3], label="y velocity")
-            self.axs[1].set_ylabel("Velocity")
-            self.axs[1].legend(loc="upper right")
-
-            # Plot angle
-            self.axs[2].plot(state_history[:, 4], label="Chaser Angle")
-            self.axs[2].plot(state_history[:, 6], label="Target Angle")
-            self.axs[2].set_ylabel("Angle (radians)")
-            self.axs[2].legend(loc="upper right")
-
-            # Plot angle speed
-            self.axs[3].plot(
-                state_history[:, 5], label="Chaser Angular Velocity"
-            )
-            self.axs[3].plot(
-                state_history[:, 7], label="Target Angular Velocity"
-            )
-            self.axs[3].set_ylabel("Angular velocity (radians/s)")
-            self.axs[3].legend(loc="upper right")
-
-            # Plot actions
-            self.axs[4].plot(
-                self.action_history, label="Actions", linestyle="-", marker="o"
-            )
-            self.axs[4].set_ylabel("Action")
-            self.axs[4].set_xlabel("Timesteps")
-            self.axs[4].legend(loc="upper right")
-
-            # Display timestamp relative to the plot time
+            self.__draw_satellite_graph()
 
             plt.pause(0.00001)  # Pause to show frame
 
@@ -254,6 +211,56 @@ class Satellite_SE2(gym.Env):  # type: ignore
             data = img[:, :, :3]  # Drop the alpha channel to get RGB
 
             return data
+        if self.render_mode == "rgb_array_graph":
+            if self.fig is None or self.axs is None:
+                self.fig, self.axs = plt.subplots(5, 1, figsize=(10, 15))
+
+            self.__draw_satellite_graph()
+            self.fig.canvas.draw()
+            img = np.array(
+                self.fig.canvas.renderer.buffer_rgba()  # type: ignore
+            )
+            data = img[:, :, :3]
+            return data
+
+        return
+
+    def __draw_satellite_graph(self):
+        if self.fig is None or self.axs is None:
+            return
+        for ax in self.axs:
+            ax.clear()
+        # State history to numpy array
+        state_history = np.array(self.state_history)
+        # Plot positions
+        self.axs[0].plot(state_history[:, 0], label="x position")
+        self.axs[0].plot(state_history[:, 1], label="y position")
+        self.axs[0].set_ylabel("Position")
+        self.axs[0].legend(loc="upper right")
+        # Plot velocities
+        self.axs[1].plot(state_history[:, 2], label="x velocity")
+        self.axs[1].plot(state_history[:, 3], label="y velocity")
+        self.axs[1].set_ylabel("Velocity")
+        self.axs[1].legend(loc="upper right")
+        # Plot angle
+        self.axs[2].plot(state_history[:, 4], label="Chaser Angle")
+        self.axs[2].plot(state_history[:, 6], label="Target Angle")
+        self.axs[2].set_ylabel("Angle (radians)")
+        self.axs[2].legend(loc="upper right")
+        # Plot angle speed
+        self.axs[3].plot(state_history[:, 5], label="Chaser Angular Velocity")
+        self.axs[3].plot(state_history[:, 7], label="Target Angular Velocity")
+        self.axs[3].set_ylabel("Angular velocity (radians/s)")
+        self.axs[3].legend(loc="upper right")
+        # Plot actions
+        self.axs[4].plot(
+            self.action_history, label="Actions", linestyle="-", marker="o"
+        )
+        self.axs[4].set_ylabel("Action")
+        self.axs[4].set_xlabel("Timesteps")
+        self.axs[4].legend(loc="upper right")
+
+        # Display timestamp relative to the plot time
         return
 
     def __draw_satellite(self):
@@ -994,7 +1001,7 @@ def _test8():
     action_under = np.array([0, 0], dtype=np.float32)
     env.action_space.sample()
     print(env.action_space.sample())
-    for _ in range(50000):
+    for _ in range(500):
         state = env.chaser.get_state()
         action_full = -k @ env.chaser.get_state()
         act_norm = np.linalg.norm(action_full[0:2])

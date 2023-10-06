@@ -29,9 +29,39 @@ def test_speed():
     env = Satellite_SE2()
     env.reset()
     start = time.time()
-    for i in range(100000):
+    for i in range(1000):
         env.step(env.action_space.sample())
     end = time.time()
     env.close()
-    print("Time taken for 100000 steps: ", end - start)
-    print("Time taken for 1 step: ", (end - start) / 100000)
+    print("Time taken for 1000 steps: ", end - start)
+    print("Time taken for 1 step: ", (end - start) / 1000)
+
+
+def test_graph():
+    from safegym.envs import Satellite_SE2
+
+    env = Satellite_SE2(render_mode="human")
+    for i in range(1000):
+        env.step(env.action_space.sample())
+    env.close()
+
+
+def test_rgb_graph():
+    from safegym.envs import Satellite_SE2
+    from matplotlib import pyplot as plt
+    from PIL import Image
+
+    env = Satellite_SE2(render_mode="rgb_array")
+
+    for i in range(10):
+        env.step(env.action_space.sample())
+    frame = env.render()
+    pause = input("Press enter to continue")
+    env.close()
+
+
+if __name__ == "__main__":
+    test_rgb_graph()
+    import sys
+
+    sys.path.append("..")

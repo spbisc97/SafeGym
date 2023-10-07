@@ -199,7 +199,7 @@ class Satellite_SE2(gym.Env):  # type: ignore
             # return
 
             if self.fig is None or self.axs is None:
-                self.fig, self.axs = plt.subplots(5, 1, figsize=(10, 15))
+                self.fig, self.axs = plt.subplots(6, 1, figsize=(10, 15))
                 plt.ion()  # Turn on interactive mode
 
             self.__draw_satellite_graph()
@@ -223,7 +223,7 @@ class Satellite_SE2(gym.Env):  # type: ignore
             return data
         if self.render_mode == "rgb_array_graph":
             if self.fig is None or self.axs is None:
-                self.fig, self.axs = plt.subplots(5, 1, figsize=(10, 15))
+                self.fig, self.axs = plt.subplots(6, 1, figsize=(10, 15))
 
             self.__draw_satellite_graph()
             self.fig.canvas.draw()
@@ -269,6 +269,14 @@ class Satellite_SE2(gym.Env):  # type: ignore
         self.axs[4].set_ylabel("Action")
         self.axs[4].set_xlabel("Timesteps")
         self.axs[4].legend(loc="upper right")
+
+        self.axs[5].plot(
+            self.reward_history, label="Reward", linestyle="-", marker="o"
+        )
+        self.axs[5].set_ylabel("Reward")
+        self.axs[5].set_xlabel("Timesteps")
+        self.axs[5].legend(loc="upper right")
+        # Legend, grid, and title
 
         # Display timestamp relative to the plot time
         return
@@ -427,12 +435,13 @@ class Satellite_SE2(gym.Env):  # type: ignore
         ch_control = self.chaser.get_control()
         ch_speed = self.chaser.speed()
         ch_state = self.chaser.get_state()
+        w_speed = 1e2
 
         reward += (
             (-np.log10(ch_radius + 0.1))
-            - (np.linalg.norm(ch_control))
-            - (np.log10(ch_speed + 1))  # chaser abs speed
-            - np.linalg.norm(ch_state[5])  # angular velocity
+            - (np.linalg.norm(ch_control) / (FTMAX * 3))
+            - (ch_speed * w_speed)  # chaser abs speed
+            - np.linalg.norm(ch_state[5]) * w_speed  # angular velocity
         )
         return reward
 

@@ -150,6 +150,10 @@ class Satellite_SE2(gym.Env):  # type: ignore
         #     )  # roughly integration to move the object
 
         self.target.reset(state[6:8])
+        self.action_history = []
+        self.state_history = []
+        self.reward_history = []
+        self.time_step = 0
         observation = self.__get_observation()
         self.xylim = self.chaser.radius() * 2
         info = {}
@@ -248,12 +252,12 @@ class Satellite_SE2(gym.Env):  # type: ignore
         self.axs[0].set_ylabel("Position")
         self.axs[0].legend(loc="upper right")
         # Plot velocities
-        self.axs[1].plot(state_history[:, 2], label="x velocity")
-        self.axs[1].plot(state_history[:, 3], label="y velocity")
+        self.axs[1].plot(state_history[:, 3], label="x velocity")
+        self.axs[1].plot(state_history[:, 4], label="y velocity")
         self.axs[1].set_ylabel("Velocity")
         self.axs[1].legend(loc="upper right")
         # Plot angle
-        self.axs[2].plot(state_history[:, 4], label="Chaser Angle")
+        self.axs[2].plot(state_history[:, 2], label="Chaser Angle")
         self.axs[2].plot(state_history[:, 6], label="Target Angle")
         self.axs[2].set_ylabel("Angle (radians)")
         self.axs[2].legend(loc="upper right")
@@ -264,14 +268,22 @@ class Satellite_SE2(gym.Env):  # type: ignore
         self.axs[3].legend(loc="upper right")
         # Plot actions
         self.axs[4].plot(
-            self.action_history, label="Actions", linestyle="-", marker="o"
+            self.action_history,
+            label="Actions",
+            linestyle=None,
+            marker=".",
+            markersize=1,
         )
         self.axs[4].set_ylabel("Action")
         self.axs[4].set_xlabel("Timesteps")
         self.axs[4].legend(loc="upper right")
 
         self.axs[5].plot(
-            self.reward_history, label="Reward", linestyle="-", marker="o"
+            self.reward_history,
+            label="Reward",
+            linestyle=None,
+            marker=".",
+            markersize=1,
         )
         self.axs[5].set_ylabel("Reward")
         self.axs[5].set_xlabel("Timesteps")
@@ -416,7 +428,6 @@ class Satellite_SE2(gym.Env):  # type: ignore
     def __get_state(self) -> np.ndarray[tuple[int], np.dtype[np.float32]]:
         w = self.chaser.get_state()
         theta = self.target.get_state()
-        state = np.zeros((10,), dtype=np.float32)
         state = np.concatenate((w, theta))
         return state
 

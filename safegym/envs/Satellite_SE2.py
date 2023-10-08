@@ -1037,9 +1037,7 @@ def _test8():
     env = Satellite_SE2(
         underactuated=True,
         render_mode="rgb_array",
-        max_action=np.float32(1),  # set to 1 for nomal control
-        starting_state=starting_state,
-        # sstarting_noise=np.zeros((8,)),
+        step=np.float32(0.1),
     )
     observation, info = env.reset()
     observations = [observation]
@@ -1050,20 +1048,20 @@ def _test8():
     action_under = np.array([0, 0], dtype=np.float32)
     env.action_space.sample()
     print(env.action_space.sample())
-    for _ in range(500):
+    for _ in range(20000):
         state = env.chaser.get_state()
         action_full = -k @ env.chaser.get_state()
         act_norm = np.linalg.norm(action_full[0:2])
         if act_norm > FTMAX:
             action_full[0:2] = action_full[0:2] / act_norm * FTMAX
         ref_state = np.array(
-            [0, 0, np.arctan2(-action_full[0], -action_full[1]), 0, 0, 0],
+            [0, 0, np.arctan2(action_full[0], action_full[1]), 0, 0, 0],
             dtype=np.float32,
         )
         error = ref_state - env.chaser.get_state()
         action_under = np.array(
             [
-                -np.linalg.norm(action_full[0:2]) / (1 + 10 * error[3] ** 2),
+                np.linalg.norm(action_full[0:2]) / (1 + error[3] ** 2),
                 np.clip(k[2, :] @ (error), -FTMAX, FTMAX),
             ],
             dtype=np.float32,
@@ -1074,7 +1072,7 @@ def _test8():
         actions.append(action_under)
         observations.append(observation)
         rewards.append(reward)
-        if _ % 100 == 0:
+        if _ % 200 == 0:
             frames.append(env.render())
 
     env.close()

@@ -19,7 +19,7 @@ TMAX: np.float32 = np.float32(6e-3)  # [Nm]
 FTMAX: np.float32 = np.float32(6e-3)  # just to clip with the same value for
 STEP: np.float32 = np.float32(0.05)  # [s]
 
-VROT_MAX = np.float32(np.pi)  # [rad/s]
+VROT_MAX = np.float32(4 * np.pi)  # [rad/s]
 VTRANS_MAX = np.float32(50)  # [m/s]
 
 XY_MAX = np.float32(1000)  # [m]
@@ -497,12 +497,13 @@ class Satellite_SE2(gym.Env):  # type: ignore
         ch_state = self.chaser.get_state()
         reward_weights = np.array([0, 0, 0, 0, 0], dtype=np.float32)
 
-        if self.success():
-            self.terminated = True
-            return 1_000_000 / self.time_step * self.__step
-        if self.crash():
-            self.terminated = True
-            return np.float32(-10000)
+        if self.termination():
+            if self.success():
+                self.terminated = True
+                return 1_000_000 / self.time_step * self.__step
+            if self.crash():
+                self.terminated = True
+                return np.float32(-10000)
 
         if self.out_of_bounds():
             self.truncated = True
@@ -586,7 +587,7 @@ class Satellite_SE2(gym.Env):  # type: ignore
     reached. If true, the user needs to call reset().
     """
 
-    def __termination(self):
+    def termination(self):
         if self.chaser.radius() < 1:
             return True
         else:

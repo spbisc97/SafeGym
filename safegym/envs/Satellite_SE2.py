@@ -68,7 +68,8 @@ class Satellite_SE2(gym.Env):  # type: ignore
             "rgb_array",
             "rgb_array_graph",
         ],
-        "render_fps": 1000,
+        "render_fps": 10,
+        "render_steps": 200,
     }
 
     def __init__(
@@ -88,7 +89,7 @@ class Satellite_SE2(gym.Env):  # type: ignore
         xy_plot_max: np.float32 = XY_PLOT_MAX,
         vtrans_max: np.float32 = VTRANS_MAX,
         vrot_max: np.float32 = VROT_MAX,
-        normalized: bool = True,
+        normalized_obs: bool = True,
     ):
         super(Satellite_SE2, self).__init__()
         assert isinstance(underactuated, bool)
@@ -116,11 +117,11 @@ class Satellite_SE2(gym.Env):  # type: ignore
         self.state_history = []
         self.action_history = []
         self.reward_history = []
-        self.time_step = 0
-        self.normalized=normalized
+        self.time_step = -1
 
         self.build_action_space()
-        self.build_observation_space()
+        self.normalized_obs = normalized_obs
+        self.build_observation_space()  # must be after self.normalized
 
         self.steps_beyond_done = None
         self.chaser = self.Chaser(
@@ -161,6 +162,8 @@ class Satellite_SE2(gym.Env):  # type: ignore
         self.state_history = []
         self.reward_history = []
         self.time_step = 0
+        self.terminated = False
+        self.truncated = False
         observation = self.__get_observation()
         self.xy_plot_lim = self.chaser.radius() * 2
         info = {}
@@ -171,21 +174,38 @@ class Satellite_SE2(gym.Env):  # type: ignore
     ) -> tuple[Any, float, bool, bool, dict[str, Any]]:
         if not self.action_space.contains(action):
             raise Exception(f"{action!r} ({type(action)}) invalid")
+        assert self.time_step is not -1, "Must reset environment first"
         self.chaser.set_control(self.__action_filter(action))
         self.chaser.step()
         self.time_step += 1  # Increment the time_step at each step.
-        terminated = False  # self.__termination()
-        truncated = False
-        reward = self._reward_function()
         observation = self.__get_observation()
+        reward = (
+            self._reward_function()
+        )  # Compute the reward after observation!
         info = {}
         self.action_history.append(self.chaser.get_control())
         self.state_history.append(self.__get_state())
         self.reward_history.append(reward)
-        if self.render_mode in ["human", "graph"]:
+
+        if not self.terminated:
+            pass
+        elif self.steps_beyond_done is None:
+            self.steps_beyond_done = 0
+        else:
+            if self.steps_beyond_done == 0:
+                warnings.warn(
+                    "You are calling 'step()' even though this "
+                    "environment has already returned done = True. "
+                    "You should always call 'reset()' once you "
+                    "receive 'done = True' -- any further steps "
+                    "are undefined behavior."
+                )
+            self.steps_beyond_done += 1
+            reward = 0.0
+        if self.render_mode in ["human"]:
             self.render()  # Update the rendering after every action
 
-        return observation, reward, terminated, truncated, info
+        return observation, reward, self.terminated, self.truncated, info
 
     def render(self):
         """Render the environment."""
@@ -197,7 +217,9 @@ class Satellite_SE2(gym.Env):  # type: ignore
                 self.ax.set_title("Satellite SE2 Environment")
                 plt.ion()  # Turn on interactive mode
 
-            if self.time_step % 100 != 0:
+            if (
+                self.time_step % self.metadata["render_steps"] != 0
+            ):  # Plot with fps
                 return
 
             self.__draw_satellite()
@@ -418,20 +440,23 @@ class Satellite_SE2(gym.Env):  # type: ignore
         w = self.chaser.get_state()
         theta = self.target.get_state()
         observation = np.zeros((10,), dtype=np.float32)
-        observation[0] = w[0]/self.xy_max
-        observation[1] = w[1]/self.xy_max
-        observation[2] = np.cos(w[2]) #already btw -1 and 1
-        observation[3] = np.sin(w[2])   #already btw -1 and 1
-        observation[4] = np.cos(theta[0]) #already btw -1 and 1
-        observation[5] = np.sin(theta[0]) #already btw -1 and 1
+        observation[0] = w[0] / self.xy_max
+        observation[1] = w[1] / self.xy_max
+        observation[2] = np.cos(w[2])  # already btw -1 and 1
+        observation[3] = np.sin(w[2])  # already btw -1 and 1
+        observation[4] = np.cos(theta[0])  # already btw -1 and 1
+        observation[5] = np.sin(theta[0])  # already btw -1 and 1
 
-        observation[6] = w[3]/self.vtrans_max
-        observation[7] = w[4]/self.vtrans_max
-        observation[8] = w[5]/self.vrot_max
-        observation[9] = theta[1]/self.vrot_max
+        observation[6] = w[3] / self.vtrans_max
+        observation[7] = w[4] / self.vtrans_max
+        observation[8] = w[5] / self.vrot_max
+        observation[9] = theta[1] / self.vrot_max
+        if any((np.abs(observation)) > 1):
+            warnings.warn("Observation is not normalized")
+        # i could just add here term or trunc conditions
 
         return observation
-    
+
     def __get_absolute_observation(
         self,
     ) -> np.ndarray[tuple[int], np.dtype[np.float32]]:
@@ -450,8 +475,6 @@ class Satellite_SE2(gym.Env):  # type: ignore
         observation[8] = w[5]
         observation[9] = theta[1]
         return observation
-        
-    
 
     def __get_state(self) -> np.ndarray[tuple[int], np.dtype[np.float32]]:
         w = self.chaser.get_state()
@@ -469,37 +492,72 @@ class Satellite_SE2(gym.Env):  # type: ignore
         return state
 
     def _reward_function(self):
-        reward = 0
         ch_radius = self.chaser.radius()
         ch_control = self.chaser.get_control()
         ch_speed = self.chaser.speed()
         ch_state = self.chaser.get_state()
-        w_speed = 1e2
+        reward_weights = np.array([0, 0, 0, 0], dtype=np.float32)
 
-        reward += (
-            (-np.log10(ch_radius + 0.1))
-            - (np.linalg.norm(ch_control) / (FTMAX * 3))
-            - (ch_speed * w_speed)  # chaser abs speed
-            - np.linalg.norm(ch_state[5]) * w_speed  # angular velocity
+        if self.success():
+            self.terminated = True
+            return 1_000_000 / self.time_step * self.__step
+        if self.crash():
+            self.terminated = True
+            return -10000
+
+        if self.out_of_bounds():
+            self.truncated = True
+            return -1000
+
+        # for shaping i could add a reward for the radius lowering
+
+        # Encourage the agent to minimize the distance
+        reward_distance = -ch_radius / (self.xy_max)
+        reward_weights[0] = 1
+
+        # Encourage the agent to minimize control effort, with normalization
+        reward_control = -np.linalg.norm(ch_control) / (FTMAX)
+        reward_weights[1] = 0.1
+
+        # Encourage the agent to maintain a desirable speed (e.g., a speed of 1)
+        reward_speed = -ch_speed
+        reward_weights[2] = 0.1
+
+        # penalize high angular velocity
+        reward_angular_velocity = -np.abs(ch_state[5])
+        reward_weights[3] = 0.1
+
+        # i could add a reward for the angle between the chaser and the target
+        # i coudl add reward_weights to init function
+
+        # Combine
+        reward = (
+            (reward_weights[0] * reward_distance)
+            + (reward_weights[1] * reward_control)
+            + (reward_weights[2] * reward_speed)
+            + (reward_weights[3] * reward_angular_velocity)
         )
-        return reward
+
+        return reward.astype(np.float32)
 
     def _reward_shaping(self):
-        reward = 0
-        ch_radius = self.chaser.radius()
-        ch_control = self.chaser.get_control()
-        ch_speed = self.chaser.speed()
-        ch_state = self.chaser.get_state()
-        reward += np.linalg.norm(ch_control) / (FTMAX * 3)  # chaser abs speed
-        reward += np.linalg.norm(ch_state[5])  # angular velocity
+        pass
 
-        reward += (
-            (-np.log10(ch_radius + 0.1))
-            - (np.linalg.norm(ch_control))
-            - (np.log10(ch_speed + 1))  # chaser abs speed
-            - np.linalg.norm(ch_state[5])  # angular velocity
-        )
-        return reward
+    def out_of_bounds(self):
+        chaser_state = self.chaser.get_state()
+        if np.abs(chaser_state[0]) > self.xy_max:
+            return True
+        if np.abs(chaser_state[1]) > self.xy_max:
+            return True
+
+        if np.abs(chaser_state[3]) > self.vtrans_max:
+            return True
+        if np.abs(chaser_state[4]) > self.vtrans_max:
+            return True
+        if np.abs(chaser_state[5]) > self.vrot_max:
+            return True
+
+        return False
 
     def __action_filter(self, action):
         max_action = self.max_action
@@ -519,7 +577,7 @@ class Satellite_SE2(gym.Env):  # type: ignore
     Can be used to end the episode prematurely before a terminal state is 
     reached. If true, the user needs to call reset().
     """
-    
+
     def __termination(self):
         if self.chaser.radius() < 1:
             return True
@@ -527,16 +585,16 @@ class Satellite_SE2(gym.Env):  # type: ignore
             return False
 
     def crash(self):
-        if (self.chaser.radius() < 1) and (self.chaser.speed() > 1):
-            return True
-        else:
-            return False
+        if self.chaser.radius() < 1:
+            if self.chaser.speed() > 0.003:
+                return True
+        return False
 
     def success(self):
-        if self.chaser.radius() < 1 and self.chaser.speed() < 1:
-            return True
-        else:
-            return False
+        if self.chaser.radius() < 1:
+            if self.chaser.speed() < 0.003:
+                return True
+        return False
 
     def build_action_space(self):
         if self.unit_action_space:
@@ -551,19 +609,34 @@ class Satellite_SE2(gym.Env):  # type: ignore
             self.action_space = spaces.Box(
                 low=-max_action, high=max_action, shape=(3,), dtype=np.float32
             )
+
     def build_observation_space(self):
-        if self.normalized == True:
+        if self.normalized_obs == True:
             self.observation_space = spaces.Box(
                 low=-1, high=1, shape=(10,), dtype=np.float32
             )
-            self.__get_observation=self.__get_normalized_observation
+            self.__get_observation = self.__get_normalized_observation
         else:
-            abs_lim=np.array([self.xy_max,self.xy_max,1,1,1,1,
-                              self.vtrans_max,self.vtrans_max,self.vrot_max,self.vrot_max],dtype=np.float32)
+            abs_lim = np.array(
+                [
+                    self.xy_max,
+                    self.xy_max,
+                    1,
+                    1,
+                    1,
+                    1,
+                    self.vtrans_max,
+                    self.vtrans_max,
+                    self.vrot_max,
+                    self.vrot_max,
+                ],
+                dtype=np.float32,
+            )
             self.observation_space = spaces.Box(
                 low=-abs_lim, high=abs_lim, shape=(10,), dtype=np.float32
             )
-            self.__get_observation=self.__get_absolute_observation
+            self.__get_observation = self.__get_absolute_observation
+
     class Chaser:
         """Chaser class for the satellite environment."""
 
@@ -1021,7 +1094,7 @@ def _test6():
     starting_state = np.zeros((8,), dtype=np.float32)
     starting_state[1] = 1000
     starting_state[2] = np.pi / 2
-    starting_state[3] = 1000/2000
+    starting_state[3] = 1000 / 2000
     env = Satellite_SE2(
         underactuated=False,
         render_mode="human",
@@ -1045,7 +1118,7 @@ def _test6():
             dtype=np.float32,
         )
         print(ref_state)
-        action = k @ (ref_state-env.chaser.get_state())
+        action = k @ (ref_state - env.chaser.get_state())
 
         if act_norm > FTMAX:
             action[0:2] = action[0:2] / act_norm * FTMAX
@@ -1099,7 +1172,7 @@ def _test8():
     starting_state = np.zeros((8,), dtype=np.float32)
     starting_state[1] = 5000
     starting_state[2] = -np.pi / 3
-    starting_state[3] = 5000/2000
+    starting_state[3] = 5000 / 2000
     env = Satellite_SE2(
         underactuated=True,
         render_mode="human",
@@ -1120,7 +1193,7 @@ def _test8():
         action_full = -k @ env.chaser.get_state()
         act_norm = np.linalg.norm(action_full[0:2])
         # if act_norm > FTMAX:
-            # action_full[0:2] = action_full[0:2] / act_norm * FTMAX
+        # action_full[0:2] = action_full[0:2] / act_norm * FTMAX
         ref_state = np.array(
             [0, 0, np.arctan2(action_full[1], action_full[0]), 0, 0, 0],
             dtype=np.float32,
@@ -1128,20 +1201,17 @@ def _test8():
         print(ref_state)
         error = ref_state - env.chaser.get_state()
         action_under = np.array(
-            [
-                act_norm / (1+np.power(10*error[2],2)),
-                k[2, :] @ (error)
-            ],
+            [act_norm / (1 + np.power(10 * error[2], 2)), k[2, :] @ (error)],
             dtype=np.float32,
         )
         if _ < 4000:
-            action_under = np.array([0, 0],dtype=np.float32)
+            action_under = np.array([0, 0], dtype=np.float32)
         observation, reward, term, trunc, info = env.step(action_under)
         actions.append(action_under)
         observations.append(observation)
         rewards.append(reward)
         # if _ % 200 == 0:
-            # frames.append(env.render())
+        # frames.append(env.render())
 
     env.close()
 

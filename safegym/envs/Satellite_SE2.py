@@ -306,8 +306,8 @@ class Satellite_SE2(gym.Env):  # type: ignore
         # Draw the target orientation
         theta = self.target.get_state()
         length = scale / 3
-        end_x = length * np.sin(theta[0])
-        end_y = length * np.cos(theta[0])
+        end_x = length * np.cos(theta[0])
+        end_y = length * np.sin(theta[0])
         self.ax.arrow(
             0,
             0,
@@ -345,19 +345,19 @@ class Satellite_SE2(gym.Env):  # type: ignore
         self.ax.arrow(
             chaser_state[0],
             chaser_state[1],
-            length * np.sin(chaser_state[2]),
             length * np.cos(chaser_state[2]),
+            length * np.sin(chaser_state[2]),
             color="blue",
             head_width=scale / 3,
             head_length=scale / 3,
         )
 
-        # Draw the chaser fore vector
+        # Draw the chaser force vector
         chaser_control = self.chaser.get_control()
         if self.underactuated:
-            length = chaser_control[0] * 1e3 * scale
-            end_x = chaser_state[0] + length * np.sin(chaser_state[2])
-            end_y = chaser_state[1] + length * np.cos(chaser_state[2])
+            length = chaser_control[0] * 3e4 * scale
+            end_x = chaser_state[0] + length * np.cos(chaser_state[2])
+            end_y = chaser_state[1] + length * np.sin(chaser_state[2])
             self.ax.plot(
                 [chaser_state[0], end_x],
                 [chaser_state[1], end_y],
@@ -413,10 +413,10 @@ class Satellite_SE2(gym.Env):  # type: ignore
         observation = np.zeros((10,), dtype=np.float32)
         observation[0] = w[0]
         observation[1] = w[1]
-        observation[2] = np.sin(w[2])
-        observation[3] = np.cos(w[2])
-        observation[4] = np.sin(theta[0])
-        observation[5] = np.cos(theta[0])
+        observation[2] = np.cos(w[2])
+        observation[3] = np.sin(w[2])
+        observation[4] = np.cos(theta[0])
+        observation[5] = np.sin(theta[0])
 
         observation[6] = w[3]
         observation[7] = w[4]
@@ -595,10 +595,10 @@ class Satellite_SE2(gym.Env):  # type: ignore
             dw[3] = (
                 (3 * (NU**2) * w[0])
                 + (2 * NU * w[4])
-                + (np.sin(w[2]) * u[0] / MASS)
+                + (np.cos(w[2]) * u[0] / MASS)
             )
 
-            dw[4] = (-2 * NU * w[3]) + (np.cos(w[2]) * u[0] / MASS)
+            dw[4] = (-2 * NU * w[3]) + (np.sin(w[2]) * u[0] / MASS)
             dw[5] = INERTIA_INV * u[1]
 
             return dw
@@ -965,10 +965,12 @@ def _test6():
         dtype=np.float32,
     )
     starting_state = np.zeros((8,), dtype=np.float32)
-    starting_state[1] = 60
+    starting_state[1] = 1000
+    starting_state[2] = np.pi / 2
+    starting_state[3] = 1000/2000
     env = Satellite_SE2(
         underactuated=False,
-        render_mode=None,
+        render_mode="human",
         max_action=np.float32(1),  # set to 1 for nomal control
         starting_state=starting_state,
         starting_noise=np.zeros((8,), dtype=np.float32),
@@ -983,9 +985,16 @@ def _test6():
     for _ in range(100000):
         action = -k @ env.chaser.get_state()
         act_norm = np.linalg.norm(action[0:2])
+        ref_state = np.array(
+            [0, 0, np.arctan2(action[1], action[0]), 0, 0, 0],
+            dtype=np.float32,
+        )
+        print(ref_state)
+        action = k @ (ref_state-env.chaser.get_state())
+
         if act_norm > FTMAX:
             action[0:2] = action[0:2] / act_norm * FTMAX
-        if _ < 50000:
+        if _ < 5000:
             action = np.array([0, 0, 0], dtype=np.float32)
         observation, reward, term, trunc, info = env.step(action)
         observations.append(observation)
@@ -1033,11 +1042,14 @@ def _test8():
         dtype=np.float32,
     )
     starting_state = np.zeros((8,), dtype=np.float32)
-    starting_state[1] = 20
+    starting_state[1] = 5000
+    starting_state[2] = -np.pi / 3
+    starting_state[3] = 5000/2000
     env = Satellite_SE2(
         underactuated=True,
-        render_mode="rgb_array",
-        step=np.float32(0.1),
+        render_mode="human",
+        step=np.float32(0.05),
+        starting_state=starting_state,
     )
     observation, info = env.reset()
     observations = [observation]
@@ -1048,32 +1060,33 @@ def _test8():
     action_under = np.array([0, 0], dtype=np.float32)
     env.action_space.sample()
     print(env.action_space.sample())
-    for _ in range(20000):
+    for _ in range(200000):
         state = env.chaser.get_state()
         action_full = -k @ env.chaser.get_state()
         act_norm = np.linalg.norm(action_full[0:2])
-        if act_norm > FTMAX:
-            action_full[0:2] = action_full[0:2] / act_norm * FTMAX
+        # if act_norm > FTMAX:
+            # action_full[0:2] = action_full[0:2] / act_norm * FTMAX
         ref_state = np.array(
-            [0, 0, np.arctan2(action_full[0], action_full[1]), 0, 0, 0],
+            [0, 0, np.arctan2(action_full[1], action_full[0]), 0, 0, 0],
             dtype=np.float32,
         )
+        print(ref_state)
         error = ref_state - env.chaser.get_state()
         action_under = np.array(
             [
-                np.linalg.norm(action_full[0:2]) / (1 + error[3] ** 2),
-                np.clip(k[2, :] @ (error), -FTMAX, FTMAX),
+                act_norm / (1+np.power(10*error[2],2)),
+                k[2, :] @ (error)
             ],
             dtype=np.float32,
         )
-        # if _ < 1:
-        #     action_under = [0, 0]
+        if _ < 4000:
+            action_under = np.array([0, 0],dtype=np.float32)
         observation, reward, term, trunc, info = env.step(action_under)
         actions.append(action_under)
         observations.append(observation)
         rewards.append(reward)
-        if _ % 200 == 0:
-            frames.append(env.render())
+        # if _ % 200 == 0:
+            # frames.append(env.render())
 
     env.close()
 

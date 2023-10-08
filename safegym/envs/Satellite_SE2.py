@@ -171,17 +171,15 @@ class Satellite_SE2(gym.Env):  # type: ignore
 
     def step(
         self, action: np.ndarray
-    ) -> tuple[Any, float, bool, bool, dict[str, Any]]:
+    ) -> tuple[Any, np.float32, bool, bool, dict[str, Any]]:
         if not self.action_space.contains(action):
             raise Exception(f"{action!r} ({type(action)}) invalid")
-        assert self.time_step is not -1, "Must reset environment first"
+        assert self.time_step != -1, "Must reset environment first"
         self.chaser.set_control(self.__action_filter(action))
         self.chaser.step()
-        self.time_step += 1  # Increment the time_step at each step.
         observation = self.__get_observation()
-        reward = (
-            self._reward_function()
-        )  # Compute the reward after observation!
+        reward = self._reward_function()  # Compute the reward
+        self.time_step += 1  # Increment the time_step at each step.
         info = {}
         self.action_history.append(self.chaser.get_control())
         self.state_history.append(self.__get_state())
@@ -201,7 +199,7 @@ class Satellite_SE2(gym.Env):  # type: ignore
                     "are undefined behavior."
                 )
             self.steps_beyond_done += 1
-            reward = 0.0
+            reward = np.float32(0.0)
         if self.render_mode in ["human"]:
             self.render()  # Update the rendering after every action
 
@@ -491,7 +489,7 @@ class Satellite_SE2(gym.Env):  # type: ignore
         ).astype(np.float32)
         return state
 
-    def _reward_function(self):
+    def _reward_function(self) -> np.float32:
         ch_radius = self.chaser.radius()
         ch_control = self.chaser.get_control()
         ch_speed = self.chaser.speed()
@@ -503,15 +501,21 @@ class Satellite_SE2(gym.Env):  # type: ignore
             return 1_000_000 / self.time_step * self.__step
         if self.crash():
             self.terminated = True
-            return -10000
+            return np.float32(-10000)
 
         if self.out_of_bounds():
             self.truncated = True
-            return -1000
+            return np.float32(-1000)
 
         # for shaping i could add a reward for the radius lowering
 
         # Encourage the agent to minimize the distance
+        if self.time_step != 0:
+            reward_decrease_distance = np.linalg.norm(
+                self.state_history[-1][0:2]
+            )
+        else:
+            reward_decrease_distance = 0
         reward_distance = -ch_radius / (self.xy_max)
         reward_weights[0] = 1
 
@@ -538,7 +542,7 @@ class Satellite_SE2(gym.Env):  # type: ignore
             + (reward_weights[3] * reward_angular_velocity)
         )
 
-        return reward.astype(np.float32)
+        return np.float32(reward)
 
     def _reward_shaping(self):
         pass

@@ -19,12 +19,12 @@ TMAX: np.float32 = np.float32(6e-3)  # [Nm]
 FTMAX: np.float32 = np.float32(6e-3)  # just to clip with the same value for
 STEP: np.float32 = np.float32(0.05)  # [s]
 
-VROT_MAX = 1  # [rad/s]
-VTRANS_MAX = 10  # [m/s]
+VROT_MAX = np.float32(np.pi)  # [rad/s]
+VTRANS_MAX = np.float32(50)  # [m/s]
 
-XY_MAX = 1000  # [m]
+XY_MAX = np.float32(1000)  # [m]
 
-XY_PLOT_MAX = 1000  # [m]
+XY_PLOT_MAX = np.float32(1000)  # [m]
 
 y0 = 5  # [m]
 STARTING_STATE = np.array([0, y0, 0, y0 / 2000, 0, 0, 0, 0], dtype=np.float32)
@@ -84,6 +84,11 @@ class Satellite_SE2(gym.Env):  # type: ignore
         unit_action_space: Optional[bool] = True,
         max_action: np.float32 = FTMAX,
         step: np.float32 = STEP,
+        xy_max: np.float32 = XY_MAX,
+        xy_plot_max: np.float32 = XY_PLOT_MAX,
+        vtrans_max: np.float32 = VTRANS_MAX,
+        vrot_max: np.float32 = VROT_MAX,
+        normalized: bool = True,
     ):
         super(Satellite_SE2, self).__init__()
         assert isinstance(underactuated, bool)
@@ -103,18 +108,20 @@ class Satellite_SE2(gym.Env):  # type: ignore
         # Added fix and axes for rendering
         self.fig = None
         self.ax = None
-        self.xylim = XY_PLOT_MAX
+        self.xy_plot_lim = xy_plot_max
+        self.xy_max = xy_max
+        self.vrot_max = vrot_max
+        self.vtrans_max = vtrans_max
         # Added lists for storing historical data plotting
         self.state_history = []
         self.action_history = []
         self.reward_history = []
         self.time_step = 0
+        self.normalized=normalized
 
         self.build_action_space()
+        self.build_observation_space()
 
-        self.observation_space = spaces.Box(
-            low=-np.inf, high=np.inf, shape=(10,), dtype=np.float32
-        )
         self.steps_beyond_done = None
         self.chaser = self.Chaser(
             underactuated=underactuated, step=self.__step
@@ -155,7 +162,7 @@ class Satellite_SE2(gym.Env):  # type: ignore
         self.reward_history = []
         self.time_step = 0
         observation = self.__get_observation()
-        self.xylim = self.chaser.radius() * 2
+        self.xy_plot_lim = self.chaser.radius() * 2
         info = {}
         return observation, info
 
@@ -185,8 +192,8 @@ class Satellite_SE2(gym.Env):  # type: ignore
         if self.render_mode == "human":
             if self.fig is None or self.ax is None:
                 self.fig, self.ax = plt.subplots()
-                self.ax.set_xlim(-self.xylim, self.xylim)
-                self.ax.set_ylim(-self.xylim, self.xylim)
+                self.ax.set_xlim(-self.xy_plot_lim, self.xy_plot_lim)
+                self.ax.set_ylim(-self.xy_plot_lim, self.xy_plot_lim)
                 self.ax.set_title("Satellite SE2 Environment")
                 plt.ion()  # Turn on interactive mode
 
@@ -213,8 +220,8 @@ class Satellite_SE2(gym.Env):  # type: ignore
         if self.render_mode == "rgb_array":
             if self.fig is None or self.ax is None:
                 self.fig, self.ax = plt.subplots()
-                self.ax.set_xlim(-self.xylim, self.xylim)
-                self.ax.set_ylim(-self.xylim, self.xylim)
+                self.ax.set_xlim(-self.xy_plot_lim, self.xy_plot_lim)
+                self.ax.set_ylim(-self.xy_plot_lim, self.xy_plot_lim)
                 self.ax.set_title("Satellite SE2 Environment")
 
             self.__draw_satellite()
@@ -298,7 +305,7 @@ class Satellite_SE2(gym.Env):  # type: ignore
             return
         # Clear the axis for new drawings
         self.ax.clear()
-        scale = self.xylim / 10
+        scale = self.xy_plot_lim / 10
 
         # Draw the target (stationary at the center)
         self.ax.scatter(0, 0, color="red", s=100, label="Target")
@@ -392,8 +399,8 @@ class Satellite_SE2(gym.Env):  # type: ignore
         # Legend, grid, and title
         self.ax.legend()
         self.ax.grid(True)
-        self.ax.set_xlim(-self.xylim, self.xylim)
-        self.ax.set_ylim(-self.xylim, self.xylim)
+        self.ax.set_xlim(-self.xy_plot_lim, self.xy_plot_lim)
+        self.ax.set_ylim(-self.xy_plot_lim, self.xy_plot_lim)
         self.ax.set_title("Satellite SE2 Environment")
 
         # Display timestamp relative to the plot time
@@ -405,7 +412,27 @@ class Satellite_SE2(gym.Env):  # type: ignore
             plt.close(self.fig)
         return
 
-    def __get_observation(
+    def __get_normalized_observation(
+        self,
+    ) -> np.ndarray[tuple[int], np.dtype[np.float32]]:
+        w = self.chaser.get_state()
+        theta = self.target.get_state()
+        observation = np.zeros((10,), dtype=np.float32)
+        observation[0] = w[0]/self.xy_max
+        observation[1] = w[1]/self.xy_max
+        observation[2] = np.cos(w[2]) #already btw -1 and 1
+        observation[3] = np.sin(w[2])   #already btw -1 and 1
+        observation[4] = np.cos(theta[0]) #already btw -1 and 1
+        observation[5] = np.sin(theta[0]) #already btw -1 and 1
+
+        observation[6] = w[3]/self.vtrans_max
+        observation[7] = w[4]/self.vtrans_max
+        observation[8] = w[5]/self.vrot_max
+        observation[9] = theta[1]/self.vrot_max
+
+        return observation
+    
+    def __get_absolute_observation(
         self,
     ) -> np.ndarray[tuple[int], np.dtype[np.float32]]:
         w = self.chaser.get_state()
@@ -422,8 +449,9 @@ class Satellite_SE2(gym.Env):  # type: ignore
         observation[7] = w[4]
         observation[8] = w[5]
         observation[9] = theta[1]
-
         return observation
+        
+    
 
     def __get_state(self) -> np.ndarray[tuple[int], np.dtype[np.float32]]:
         w = self.chaser.get_state()
@@ -478,6 +506,20 @@ class Satellite_SE2(gym.Env):  # type: ignore
         action = action * max_action
         return action
 
+    """Terminated (bool) 
+    – Whether the agent reaches the terminal state (as defined under the MDP of 
+    the task) which can be positive or negative. An example is reaching the 
+    goal state or moving into the lava from the Sutton and Barton, Gridworld. 
+    If true, the user needs to call reset().
+
+    Truncated (bool) 
+    – Whether the truncation condition outside the scope of the MDP is 
+    satisfied. Typically, this is a timelimit, but could also be used to 
+    indicate an agent physically going out of bounds. 
+    Can be used to end the episode prematurely before a terminal state is 
+    reached. If true, the user needs to call reset().
+    """
+    
     def __termination(self):
         if self.chaser.radius() < 1:
             return True
@@ -509,7 +551,19 @@ class Satellite_SE2(gym.Env):  # type: ignore
             self.action_space = spaces.Box(
                 low=-max_action, high=max_action, shape=(3,), dtype=np.float32
             )
-
+    def build_observation_space(self):
+        if self.normalized == True:
+            self.observation_space = spaces.Box(
+                low=-1, high=1, shape=(10,), dtype=np.float32
+            )
+            self.__get_observation=self.__get_normalized_observation
+        else:
+            abs_lim=np.array([self.xy_max,self.xy_max,1,1,1,1,
+                              self.vtrans_max,self.vtrans_max,self.vrot_max,self.vrot_max],dtype=np.float32)
+            self.observation_space = spaces.Box(
+                low=-abs_lim, high=abs_lim, shape=(10,), dtype=np.float32
+            )
+            self.__get_observation=self.__get_absolute_observation
     class Chaser:
         """Chaser class for the satellite environment."""
 
@@ -974,6 +1028,7 @@ def _test6():
         max_action=np.float32(1),  # set to 1 for nomal control
         starting_state=starting_state,
         starting_noise=np.zeros((8,), dtype=np.float32),
+        normalized=False,
     )
     observation, info = env.reset()
     observations = [observation]
@@ -1108,4 +1163,4 @@ def _scalene_profiler():
 if __name__ == "__main__":
     from gymnasium.envs.registration import register
 
-    _test8()
+    _test6()

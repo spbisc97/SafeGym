@@ -451,6 +451,7 @@ class Satellite_SE2(gym.Env):  # type: ignore
         observation[9] = theta[1] / self.vrot_max
         if any((np.abs(observation)) > 1):
             warnings.warn("Observation is not normalized")
+            print(observation)
         # i could just add here term or trunc conditions
 
         return observation
@@ -1106,6 +1107,7 @@ def _test6():
         starting_state=starting_state,
         starting_noise=np.zeros((8,), dtype=np.float32),
         normalized_obs=False,
+        step=np.float32(0.1),
     )
     observation, info = env.reset()
     observations = [observation]
@@ -1114,25 +1116,19 @@ def _test6():
     action = np.array([0, 0, 0], dtype=np.float32)
     env.action_space.sample()
     print(env.action_space.sample())
-    for _ in range(100000):
+    for _ in range(8000):
         action = -k @ env.chaser.get_state()
         act_norm = np.linalg.norm(action[0:2])
-        ref_state = np.array(
-            [0, 0, np.arctan2(action[1], action[0]), 0, 0, 0],
-            dtype=np.float32,
-        )
-        print(ref_state)
-        action = k @ (ref_state - env.chaser.get_state())
 
         if act_norm > FTMAX:
             action[0:2] = action[0:2] / act_norm * FTMAX
-        if _ < 5000:
+        if _ < 0:
             action = np.array([0, 0, 0], dtype=np.float32)
         observation, reward, term, trunc, info = env.step(action)
         observations.append(observation)
         rewards.append(reward)
-        if _ % 100 == 0:
-            frames.append(env.render())
+        # if _ % 100 == 0:
+        # frames.append(env.render())
     env.close()
     plt.plot(rewards)
     plt.show()

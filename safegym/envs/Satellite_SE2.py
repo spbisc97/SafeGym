@@ -1105,7 +1105,7 @@ def _test6():
         max_action=np.float32(1),  # set to 1 for nomal control
         starting_state=starting_state,
         starting_noise=np.zeros((8,), dtype=np.float32),
-        normalized=False,
+        normalized_obs=False,
     )
     observation, info = env.reset()
     observations = [observation]

@@ -9,7 +9,6 @@ logging.basicConfig(level=logging.INFO)
 
 def test_imports():
     from safegym.envs import Satellite_SE2
-    from safegym.envs import Satellite_rot
 
 
 def test_env():
@@ -41,6 +40,7 @@ def test_graph():
     from safegym.envs import Satellite_SE2
 
     env = Satellite_SE2(render_mode="human")
+    env.reset()
     for i in range(1000):
         env.step(env.action_space.sample())
     env.close()
@@ -52,7 +52,7 @@ def test_rgb_graph():
     from PIL import Image
 
     env = Satellite_SE2(render_mode="rgb_array")
-
+    env.reset()
     for i in range(10):
         env.step(env.action_space.sample())
     frame = env.render()

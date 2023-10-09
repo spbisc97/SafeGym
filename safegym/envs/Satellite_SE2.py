@@ -4,6 +4,7 @@ import numpy as np
 from typing import Any, Optional, SupportsFloat, Tuple
 import matplotlib
 import matplotlib.pyplot as plt
+from matplotlib.patches import Circle
 import warnings
 
 matplotlib.rcParams["figure.raise_window"] = False
@@ -34,6 +35,8 @@ STARTING_NOISE = np.array(
 )
 
 EULER_SPEEDUP = True
+
+CIRCLE = Circle((0, 0), 1, color="green", fill=False, linewidth=1, alpha=0.5)
 
 
 class Satellite_SE2(gym.Env):  # type: ignore
@@ -416,8 +419,9 @@ class Satellite_SE2(gym.Env):  # type: ignore
                 + f"T:{(chaser_control[2]):.2e}",
             )
 
+        self.ax.add_patch(CIRCLE)
         self.ax.plot(
-            [], color="blue", label=f"Rew: {self._reward_function():.2e}"
+            [], color="green", label=f"Rew: {self._reward_function():.2e}"
         )
 
         # Legend, grid, and title
@@ -530,7 +534,7 @@ class Satellite_SE2(gym.Env):  # type: ignore
         reward_control = -np.linalg.norm(ch_control) / (FTMAX)
         reward_weights[2] = 0.05
 
-        # Encourage the agent to maintain a desirable speed (e.g., a speed of 1)
+        # Encourage the agent to maintain low speed
         reward_speed = -ch_speed / (VTRANS_MAX)
         reward_weights[3] = 0.1
 

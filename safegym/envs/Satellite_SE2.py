@@ -15,8 +15,8 @@ MU = 3.986004418 * 10**14  # [m^3/s^2]
 RT = 6.6 * 1e6  # [m]
 NU = np.sqrt(MU / RT**3)
 FMAX = 1.05e-3  # [N]
-TMAX: np.float32 = np.float32(6e-3)  # [Nm]
-FTMAX: np.float32 = np.float32(6e-3)  # just to clip with the same value for
+TMAX: np.float32 = np.float32(1e-4)  # [Nm]
+FTMAX: np.float32 = np.float32(1e-3)  # just to clip with the same value for
 STEP: np.float32 = np.float32(0.05)  # [s]
 
 VROT_MAX = np.float32(3 * np.pi)  # [rad/s]
@@ -504,9 +504,12 @@ class Satellite_SE2(gym.Env):  # type: ignore
         if self.termination():
             self.terminated = True
             if self.unconstrained or self.success():
-                return 1000 + 1_000_000 / (self.time_step * self.__step)
+                return np.float32(
+                    1000 + 
+                    (1_000_000 / (self.time_step * self.__step)) * 
+                    (1 / ch_speed))
             if self.crash():
-                return np.float32(-200)
+                return np.float32(-5000*ch_speed)
 
         if self.out_of_bounds():
             self.truncated = True

@@ -97,6 +97,7 @@ def test_reward():
         render_mode="human",
         max_action=np.float32(1),
         step=np.float32(0.1),
+        unconstrained=True,
     )
     env.reset()
     rewards = []
@@ -121,11 +122,34 @@ def test_trajectory():
     env.reset()
     empty = np.zeros((2,), dtype=np.uint8)
     rewards = []
-    for i in range(100_000):
+    for i in range(1_000):
         obs, rew, trunc, term, info = env.step(empty)
         rewards.append(rew)
     env.close()
     print("Total reward: ", sum(rewards))
+
+
+def test_underactuated():
+    import safegym
+    import gymnasium as gym
+
+    env = gym.make("Satellite-SE2-v0", underactuated=True)
+    env.reset()
+    for i in range(1000):
+        env.step(env.action_space.sample())
+
+    env.close()
+
+
+def test_fullyactuated():
+    import safegym
+    import gymnasium as gym
+
+    env = gym.make("Satellite-SE2-v0", underactuated=False)
+    env.reset()
+    for i in range(1000):
+        env.step(env.action_space.sample())
+    env.close()
 
 
 def profile():

@@ -19,7 +19,7 @@ TMAX: np.float32 = np.float32(6e-3)  # [Nm]
 FTMAX: np.float32 = np.float32(6e-3)  # just to clip with the same value for
 STEP: np.float32 = np.float32(0.05)  # [s]
 
-VROT_MAX = np.float32(4 * np.pi)  # [rad/s]
+VROT_MAX = np.float32(3 * np.pi)  # [rad/s]
 VTRANS_MAX = np.float32(50)  # [m/s]
 
 XY_MAX = np.float32(1000)  # [m]
@@ -29,7 +29,9 @@ XY_PLOT_MAX = np.float32(1000)  # [m]
 y0 = 5  # [m]
 STARTING_STATE = np.array([0, y0, 0, y0 / 2000, 0, 0, 0, 0], dtype=np.float32)
 
-STARTING_NOISE = np.array([0, 0, 0, 0, 0, 0, 0, 0])
+STARTING_NOISE = np.array(
+    [0.1, 0.1, 0.2, 1e-6, 1e-6, 0.001, 0, 0], dtype=np.float32
+)
 
 EULER_SPEEDUP = True
 
@@ -90,6 +92,7 @@ class Satellite_SE2(gym.Env):  # type: ignore
         vtrans_max: np.float32 = VTRANS_MAX,
         vrot_max: np.float32 = VROT_MAX,
         normalized_obs: bool = True,
+        unconstrained: bool = False,
     ):
         super(Satellite_SE2, self).__init__()
         assert isinstance(underactuated, bool)
@@ -101,6 +104,7 @@ class Satellite_SE2(gym.Env):  # type: ignore
         self.max_action = max_action
         self.starting_state = starting_state
         self.starting_noise = starting_noise
+        self.unconstrained = unconstrained
         assert (
             render_mode in self.metadata["render_modes"] or render_mode is None
         )
@@ -498,12 +502,11 @@ class Satellite_SE2(gym.Env):  # type: ignore
         reward_weights = np.array([0, 0, 0, 0, 0], dtype=np.float32)
 
         if self.termination():
-            if self.success():
-                self.terminated = True
-                return 1_000_000 / self.time_step * self.__step
+            self.terminated = True
+            if self.unconstrained or self.success():
+                return 1000 + 1_000_000 / (self.time_step * self.__step)
             if self.crash():
-                self.terminated = True
-                return np.float32(-10000)
+                return np.float32(-200)
 
         if self.out_of_bounds():
             self.truncated = True
@@ -518,7 +521,7 @@ class Satellite_SE2(gym.Env):  # type: ignore
             ) - ch_radius
         else:
             reward_decrease_distance = 0
-        reward_weights[0] = 12
+        reward_weights[0] = 10
 
         reward_distance = -ch_radius / (self.xy_max)
         reward_weights[1] = 1
@@ -529,11 +532,11 @@ class Satellite_SE2(gym.Env):  # type: ignore
 
         # Encourage the agent to maintain a desirable speed (e.g., a speed of 1)
         reward_speed = -ch_speed / (VTRANS_MAX)
-        reward_weights[3] = 1
+        reward_weights[3] = 0.1
 
         # penalize high angular velocity
         reward_angular_velocity = -np.abs(ch_state[5]) / (VROT_MAX)
-        reward_weights[4] = 0.1
+        reward_weights[4] = 10
 
         # i could add a reward for the angle between the chaser and the target
         # i coudl add reward_weights to init function
@@ -594,14 +597,14 @@ class Satellite_SE2(gym.Env):  # type: ignore
             return False
 
     def crash(self):
-        if self.chaser.radius() < 1:
-            if self.chaser.speed() > 0.003:
+        if self.chaser.radius() < 1:  # just keep the double check
+            if self.chaser.speed() > 0.01:  # 0.01m/s = 1cm/s
                 return True
         return False
 
     def success(self):
-        if self.chaser.radius() < 1:
-            if self.chaser.speed() < 0.003:
+        if self.chaser.radius() < 1:  # just keep the double check
+            if self.chaser.speed() < 0.01:  # 0.01m/s = 1cm/s
                 return True
         return False
 

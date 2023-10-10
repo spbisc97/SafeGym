@@ -516,11 +516,11 @@ class Satellite_SE2(gym.Env):  # type: ignore
                 self.is_success = True
                 return np.float32(
                     1000
-                    + (1_000_000 / (self.time_step * self.__step))
-                    * (1 / ch_speed)
+                    + (1_000_000 / ((self.time_step + 1) * self.__step))
+                    * (1 / (ch_speed + 1e-4))
                 )
             if self.crash():
-                return np.float32(-5000 * ch_speed)
+                return np.float32(-5000 * (ch_speed + 1e-4))
 
         if self.out_of_bounds():
             self.truncated = True

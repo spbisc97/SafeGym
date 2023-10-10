@@ -36,8 +36,6 @@ STARTING_NOISE = np.array(
 
 EULER_SPEEDUP = True
 
-CIRCLE = Circle((0, 0), 1, color="green", fill=False, linewidth=1, alpha=0.5)
-
 
 class Satellite_SE2(gym.Env):  # type: ignore
     """
@@ -108,6 +106,7 @@ class Satellite_SE2(gym.Env):  # type: ignore
         self.starting_state = starting_state
         self.starting_noise = starting_noise
         self.unconstrained = unconstrained
+        self.is_success = False
         assert (
             render_mode in self.metadata["render_modes"] or render_mode is None
         )
@@ -171,9 +170,10 @@ class Satellite_SE2(gym.Env):  # type: ignore
         self.time_step = 0
         self.terminated = False
         self.truncated = False
+        self.is_success = False
         observation = self.__get_observation()
         self.xy_plot_lim = self.chaser.radius() * 2
-        info = {}
+        info = {"is_success": self.is_success, "time_step": self.time_step}
         return observation, info
 
     def step(
@@ -187,7 +187,10 @@ class Satellite_SE2(gym.Env):  # type: ignore
         observation = self.__get_observation()
         reward = self._reward_function()  # Compute the reward
         self.time_step += 1  # Increment the time_step at each step.
-        info = {}
+        info = {"is_success": self.is_success, "time_step": self.time_step}
+        # "action": action,
+        # "observation": observation,
+        # "reward": reward,}
         self.action_history.append(self.chaser.get_control())
         self.state_history.append(self.__get_state())
         self.reward_history.append(reward)
@@ -418,7 +421,9 @@ class Satellite_SE2(gym.Env):  # type: ignore
                 + "\n"
                 + f"T:{(chaser_control[2]):.2e}",
             )
-
+        CIRCLE = Circle(  # create patch outside of the func gives errors?!
+            (0, 0), 1, color="green", fill=False, linewidth=1, alpha=0.5
+        )
         self.ax.add_patch(CIRCLE)
         self.ax.plot(
             [], color="green", label=f"Rew: {self._reward_function():.2e}"
@@ -508,12 +513,14 @@ class Satellite_SE2(gym.Env):  # type: ignore
         if self.termination():
             self.terminated = True
             if self.unconstrained or self.success():
+                self.is_success = True
                 return np.float32(
-                    1000 + 
-                    (1_000_000 / (self.time_step * self.__step)) * 
-                    (1 / ch_speed))
+                    1000
+                    + (1_000_000 / (self.time_step * self.__step))
+                    * (1 / ch_speed)
+                )
             if self.crash():
-                return np.float32(-5000*ch_speed)
+                return np.float32(-5000 * ch_speed)
 
         if self.out_of_bounds():
             self.truncated = True

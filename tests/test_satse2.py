@@ -85,12 +85,12 @@ def test_rgb_graph():
     for i in range(10):
         env.step(env.action_space.sample())
     frame = env.render()
-    pause = input("Press enter to continue")
     env.close()
 
 
 def test_reward():
     from safegym.envs import Satellite_SE2
+    from gymnasium.wrappers.time_limit import TimeLimit
 
     env = Satellite_SE2(
         underactuated=False,
@@ -99,12 +99,13 @@ def test_reward():
         step=np.float32(0.1),
         unconstrained=True,
     )
+    TimeLimit(env, max_episode_steps=10000)
     env.reset()
     rewards = []
     done = False
     while not done:
         obs, reward, trunc, term, info = env.step(
-            -k @ env.chaser.get_state() * (0.4)
+            -k @ env.chaser.get_state() * (1)
         )
         rewards.append(reward)
         done = term or trunc
@@ -118,15 +119,20 @@ def test_trajectory():
     from matplotlib import pyplot as plt
     from PIL import Image
 
-    env = Satellite_SE2()
-    env.reset()
-    empty = np.zeros((2,), dtype=np.uint8)
-    rewards = []
-    for i in range(1_000):
-        obs, rew, trunc, term, info = env.step(empty)
-        rewards.append(rew)
-    env.close()
-    print("Total reward: ", sum(rewards))
+    for i in range(5):
+        env = Satellite_SE2(
+            render_mode="human",
+            initial_integration_steps=np.array([100, 10000]),
+            step=np.float32(0.1),
+        )
+        env.reset()
+        empty = np.zeros((2,), dtype=np.uint8)
+        rewards = []
+        for i in range(4_000):
+            obs, rew, trunc, term, info = env.step(empty)
+            rewards.append(rew)
+        env.close()
+        print("Total reward: ", sum(rewards))
 
 
 def test_underactuated():

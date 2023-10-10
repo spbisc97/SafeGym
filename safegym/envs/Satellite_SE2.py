@@ -20,18 +20,43 @@ TMAX: np.float32 = np.float32(1e-4)  # [Nm]
 FTMAX: np.float32 = np.float32(1e-3)  # just to clip with the same value for
 STEP: np.float32 = np.float32(0.05)  # [s]
 
-VROT_MAX = np.float32(3 * np.pi)  # [rad/s]
+VROT_MAX = np.float32(2 * np.pi)  # [rad/s]
 VTRANS_MAX = np.float32(50)  # [m/s]
 
-XY_MAX = np.float32(1000)  # [m]
+XY_MAX = np.float32(100)  # [m]
 
-XY_PLOT_MAX = np.float32(1000)  # [m]
+XY_PLOT_MAX = np.float32(100)  # [m]
 
-y0 = 5  # [m]
-STARTING_STATE = np.array([0, y0, 0, y0 / 2000, 0, 0, 0, 0], dtype=np.float32)
+y0: np.float32 = np.float32(20)  # [m]
+# STARTING_STATE=
+radius: np.float32 = y0  # [m],
+speed: np.float32 = np.float32(radius / 2000)  # [m/s],
+theta: np.float32 = np.float32(0)  # [rad],
+theta_dot: np.float32 = np.float32(0)  # [rad/s],
+phi: np.float32 = np.float32(0)  # [rad]
+phi_dot: np.float32 = np.float32(0)  # [rad/s]
+STARTING_STATE = np.array(
+    [radius, speed, theta, theta_dot, phi, phi_dot], dtype=np.float32
+)
+
+radius_noise: np.float32 = radius / 2
+speed_noise: np.float32 = speed / 100
+theta_noise: np.float32 = np.float32(np.pi * 2)
+theta_dot_noise: np.float32 = np.float32(1e-3)
+phi_noise: np.float32 = np.float32(0)
+phi_dot_noise: np.float32 = np.float32(0)
+initial_integraton_steps = np.array([0, 100], dtype=np.int32)
 
 STARTING_NOISE = np.array(
-    [0.1, 0.1, 0.2, 1e-6, 1e-6, 0.001, 0, 0], dtype=np.float32
+    [
+        radius_noise,
+        speed_noise,
+        theta_noise,
+        theta_dot_noise,
+        phi_noise,
+        phi_dot_noise,
+    ],
+    dtype=np.float32,
 )
 
 EULER_SPEEDUP = True
@@ -94,6 +119,9 @@ class Satellite_SE2(gym.Env):  # type: ignore
         vrot_max: np.float32 = VROT_MAX,
         normalized_obs: bool = True,
         unconstrained: bool = False,
+        initial_integration_steps: np.ndarray[
+            tuple[int], np.dtype[np.int32]
+        ] = initial_integraton_steps,
     ):
         super(Satellite_SE2, self).__init__()
         assert isinstance(underactuated, bool)
@@ -107,6 +135,7 @@ class Satellite_SE2(gym.Env):  # type: ignore
         self.starting_noise = starting_noise
         self.unconstrained = unconstrained
         self.is_success = False
+        self.initial_integration_steps = initial_integration_steps
         assert (
             render_mode in self.metadata["render_modes"] or render_mode is None
         )
@@ -142,28 +171,46 @@ class Satellite_SE2(gym.Env):  # type: ignore
         self, *, seed: int | None = None, options: dict[str, Any] | None = None
     ) -> tuple[Any, dict[str, Any]]:
         super().reset(seed=seed, options=options)
-        state: np.ndarray[tuple[int], np.dtype[np.float32]] = (
-            self.__state_generator()
+
+        radius = np.random.normal(
+            self.starting_state[0], self.starting_noise[0]
         )
-        # set a not really stable initial traejctory
-        # chaser_stable_random = np.hstack(
-        #     (
-        #         0,
-        #         random_state[1],
-        #         random_state[2],
-        #         random_state[1] / 2000,
-        #         0,  # random_state[0] * 2e-3,
-        #         random_state[5],
-        #     )
-        # )
+        if radius < 1:
+            radius = 1
+        speed = radius / 2000
+        speed = np.random.normal(speed, speed / 10)
 
-        self.chaser.reset(state[0:6])
-        # for _ in range(np.random.randint(10, 5000)):
-        #     self.chaser.step(
-        #         np.float32(0.5)
-        #     )  # roughly integration to move the object
+        theta = np.random.normal(
+            self.starting_state[2], self.starting_noise[2]
+        )
+        omega = np.random.normal(
+            self.starting_state[3], self.starting_noise[3]
+        )
 
-        self.target.reset(state[6:8])
+        # set a stable initial trajectory
+        chaser_stable_random = np.hstack(
+            (
+                0,  # x
+                radius,  # y
+                theta,  # theta
+                speed,  # vx
+                0,  # vy
+                omega,  # omega
+            ),
+            dtype=np.float32,
+        )
+        target_random = np.random.normal(
+            self.starting_state[4:6], self.starting_noise[4:6]
+        ).astype(np.float32)
+
+        self.chaser.reset(chaser_stable_random)
+        action_free_steps = np.random.randint(
+            self.initial_integration_steps[0],
+            self.initial_integration_steps[1],
+        )
+        for i in range(0, action_free_steps):
+            self.chaser.step()
+        self.target.reset(target_random)
         self.action_history = []
         self.state_history = []
         self.reward_history = []
@@ -492,15 +539,6 @@ class Satellite_SE2(gym.Env):  # type: ignore
         w = self.chaser.get_state()
         theta = self.target.get_state()
         state = np.concatenate((w, theta))
-        return state
-
-    def __state_generator(self):
-        state: np.ndarray[tuple[int], np.dtype[np.float32]]
-        state = np.random.normal(
-            self.starting_state,
-            self.starting_noise,
-            size=(8,),
-        ).astype(np.float32)
         return state
 
     def _reward_function(self) -> np.float32:
@@ -892,8 +930,6 @@ def _test2(underactuated=True):
     env = Satellite_SE2(
         underactuated=underactuated,
         render_mode="human",
-        starting_state=np.array([0, 10, 0, 0, 0, 0, 0, 0], dtype=np.float32),
-        starting_noise=np.zeros((8,), dtype=np.float32),
     )
     observation, info = env.reset()
     observations = [observation]
@@ -928,14 +964,10 @@ def _test3(underactuated=True):
         reward_threshold=0.0,
     )
 
-    starting_state = np.array([0, 10, 0, 0, 0, 0, 0, 0], dtype=np.float32)
-    starting_noise = np.zeros((8,))
     model = PPO.load("Satellite_SE2")
     env = gym.make(
         "Satellite_SE2-v0",
         underactuated=underactuated,
-        starting_state=starting_state,
-        starting_noise=starting_noise,
     )
     model.set_env(env)
     # model = PPO("MlpPolicy", env=env, verbose=1)
@@ -953,8 +985,6 @@ def _test3(underactuated=True):
     env = gym.make(
         "Satellite_SE2-v0",
         underactuated=underactuated,
-        starting_state=starting_state,
-        starting_noise=starting_noise,
         render_mode="rgb_array",
     )
     env.reset()
@@ -982,12 +1012,9 @@ def _test3(underactuated=True):
 
 def _test4():
     # check just the dynamics
-    starting_state = np.zeros((8,), dtype=np.float32)
-    starting_state[1] = 30
+
     env = Satellite_SE2(
         render_mode=None,
-        starting_noise=np.zeros((8,), dtype=np.float32),
-        starting_state=starting_state,
     )
     observation, info = env.reset()
     observations = [observation]
@@ -1042,15 +1069,11 @@ def _test5():
     )
 
     # check just the dynamicsstarting_state = np.zeros((8,))
-    starting_state = np.zeros((8,), dtype=np.float32)
-    starting_state[1] = 30
 
     env = Satellite_SE2(
         underactuated=False,
         render_mode="rgb_array",
         max_action=np.float32(1),  # set to 1 for nomal control
-        starting_state=starting_state,
-        starting_noise=np.zeros((8,), dtype=np.float32),
     )
     # env = HumanRenderingV0(env)
     # env = RecordVideoV0(env, video_folder=".", video_length=0)
@@ -1117,16 +1140,11 @@ def _test6():
         ],
         dtype=np.float32,
     )
-    starting_state = np.zeros((8,), dtype=np.float32)
-    starting_state[1] = 1000
-    starting_state[2] = np.pi / 2
-    starting_state[3] = 1000 / 2000
+
     env = Satellite_SE2(
         underactuated=False,
         render_mode="human",
         max_action=np.float32(1),  # set to 1 for nomal control
-        starting_state=starting_state,
-        starting_noise=np.zeros((8,), dtype=np.float32),
         normalized_obs=False,
         step=np.float32(0.1),
     )
@@ -1190,15 +1208,11 @@ def _test8():
         ],
         dtype=np.float32,
     )
-    starting_state = np.zeros((8,), dtype=np.float32)
-    starting_state[1] = 5000
-    starting_state[2] = -np.pi / 3
-    starting_state[3] = 5000 / 2000
+
     env = Satellite_SE2(
         underactuated=True,
         render_mode="human",
         step=np.float32(0.05),
-        starting_state=starting_state,
     )
     observation, info = env.reset()
     observations = [observation]

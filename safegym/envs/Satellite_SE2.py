@@ -382,6 +382,7 @@ class Satellite_SE2(gym.Env):  # type: ignore
             marker=".",
             markersize=1,
         )
+        self.axs[5].yscale("symlog")
         self.axs[5].set_ylabel("Reward")
         self.axs[5].set_xlabel("Timesteps")
         self.axs[5].legend(loc="upper right")

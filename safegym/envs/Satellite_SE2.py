@@ -270,7 +270,7 @@ class Satellite_SE2(gym.Env):  # type: ignore
         """Render the environment."""
         if self.render_mode == "human":
             if self.fig is None or self.ax is None:
-                self.fig, self.ax = plt.subplots()
+                self.fig, self.ax = plt.subplots(layout="constrained")
                 self.ax.set_xlim(-self.xy_plot_lim, self.xy_plot_lim)
                 self.ax.set_ylim(-self.xy_plot_lim, self.xy_plot_lim)
                 self.ax.set_title("Satellite SE2 Environment")
@@ -291,7 +291,9 @@ class Satellite_SE2(gym.Env):  # type: ignore
             # return
 
             if self.fig is None or self.axs is None:
-                self.fig, self.axs = plt.subplots(6, 1, figsize=(10, 15))
+                self.fig, self.axs = plt.subplots(
+                    6, 1, figsize=(10, 15), layout="constrained"
+                )
                 plt.ion()  # Turn on interactive mode
 
             self.__draw_satellite_graph()
@@ -300,7 +302,7 @@ class Satellite_SE2(gym.Env):  # type: ignore
 
         if self.render_mode == "rgb_array":
             if self.fig is None or self.ax is None:
-                self.fig, self.ax = plt.subplots()
+                self.fig, self.ax = plt.subplots(layout="constrained")
                 self.ax.set_xlim(-self.xy_plot_lim, self.xy_plot_lim)
                 self.ax.set_ylim(-self.xy_plot_lim, self.xy_plot_lim)
                 self.ax.set_title("Satellite SE2 Environment")
@@ -315,7 +317,7 @@ class Satellite_SE2(gym.Env):  # type: ignore
             return data
         if self.render_mode == "rgb_array_graph":
             if self.fig is None or self.axs is None:
-                self.fig, self.axs = plt.subplots(6, 1, figsize=(10, 15))
+                self.fig, self.axs = plt.subplots(6, 1, figsize=(10, 15),layout="constrained")
 
             self.__draw_satellite_graph()
             self.fig.canvas.draw()

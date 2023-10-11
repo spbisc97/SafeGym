@@ -45,7 +45,7 @@ theta_noise: np.float32 = np.float32(np.pi * 2)
 theta_dot_noise: np.float32 = np.float32(1e-3)
 phi_noise: np.float32 = np.float32(0)
 phi_dot_noise: np.float32 = np.float32(0)
-initial_integraton_steps = np.array([0, 100], dtype=np.int32)
+INITIAL_INTEGRATION_STEPS = np.array([0, 100], dtype=np.int32)
 
 STARTING_NOISE = np.array(
     [
@@ -58,7 +58,8 @@ STARTING_NOISE = np.array(
     ],
     dtype=np.float32,
 )
-
+# REWARD_WEIGHTS = distance_decrease,distance,action,speed,angle_speed
+REWARD_WEIGHTS = np.array([10, 0.8, 0.5, 1, 20], dtype=np.float32)
 EULER_SPEEDUP = True
 
 
@@ -121,7 +122,10 @@ class Satellite_SE2(gym.Env):  # type: ignore
         unconstrained: bool = False,
         initial_integration_steps: np.ndarray[
             tuple[int], np.dtype[np.int32]
-        ] = initial_integraton_steps,
+        ] = INITIAL_INTEGRATION_STEPS,
+        reward_weights: np.ndarray[
+            tuple[int], np.dtype[np.float32]
+        ] = REWARD_WEIGHTS,
     ):
         super(Satellite_SE2, self).__init__()
         assert isinstance(underactuated, bool)
@@ -136,6 +140,7 @@ class Satellite_SE2(gym.Env):  # type: ignore
         self.unconstrained = unconstrained
         self.is_success = False
         self.initial_integration_steps = initial_integration_steps
+        self.reward_weights = reward_weights
         assert (
             render_mode in self.metadata["render_modes"] or render_mode is None
         )
@@ -242,6 +247,8 @@ class Satellite_SE2(gym.Env):  # type: ignore
         # "action": action,
         # "observation": observation,
         # "reward": reward,}
+        if self.render_mode in ["human"]:
+            self.render()  # Update the rendering after every action
         self.action_history.append(self.chaser.get_control())
         self.state_history.append(self.__get_state())
         self.reward_history.append(reward)
@@ -261,8 +268,6 @@ class Satellite_SE2(gym.Env):  # type: ignore
                 )
             self.steps_beyond_done += 1
             reward = np.float32(0.0)
-        if self.render_mode in ["human"]:
-            self.render()  # Update the rendering after every action
 
         return observation, reward, self.terminated, self.truncated, info
 
@@ -317,7 +322,9 @@ class Satellite_SE2(gym.Env):  # type: ignore
             return data
         if self.render_mode == "rgb_array_graph":
             if self.fig is None or self.axs is None:
-                self.fig, self.axs = plt.subplots(6, 1, figsize=(10, 15),layout="constrained")
+                self.fig, self.axs = plt.subplots(
+                    6, 1, figsize=(10, 15), layout="constrained"
+                )
 
             self.__draw_satellite_graph()
             self.fig.canvas.draw()
@@ -552,7 +559,6 @@ class Satellite_SE2(gym.Env):  # type: ignore
         ch_control = self.chaser.get_control()
         ch_speed = self.chaser.speed()
         ch_state = self.chaser.get_state()
-        reward_weights = np.array([0, 0, 0, 0, 0], dtype=np.float32)
 
         if self.termination():
             self.terminated = True
@@ -574,39 +580,51 @@ class Satellite_SE2(gym.Env):  # type: ignore
 
         # Encourage the agent to minimize the distance
         if self.time_step != 0:
-            reward_decrease_distance = (
+            reward_decreased_distance = (
                 np.linalg.norm(self.state_history[-1][0:2])
             ) - ch_radius
         else:
-            reward_decrease_distance = 0
-        reward_weights[0] = 10
+            reward_decreased_distance = 0
+        reward_decreased_distance = reward_decreased_distance * (
+            self.xy_max / (ch_radius + 1e-4)
+        )
 
         reward_distance = -ch_radius / (self.xy_max)
-        reward_weights[1] = 1
 
         # Encourage the agent to minimize control effort, with normalization
         reward_control = -np.linalg.norm(ch_control) / (FTMAX)
-        reward_weights[2] = 0.05
 
         # Encourage the agent to maintain low speed
         reward_speed = -ch_speed / (VTRANS_MAX)
-        reward_weights[3] = 0.1
 
         # penalize high angular velocity
         reward_angular_velocity = -np.abs(ch_state[5]) / (VROT_MAX)
-        reward_weights[4] = 10
 
         # i could add a reward for the angle between the chaser and the target
         # i coudl add reward_weights to init function
 
         # Combine
         reward = (
-            (reward_weights[0] * reward_decrease_distance)
-            + (reward_weights[1] * reward_distance)
-            + (reward_weights[2] * reward_control)
-            + (reward_weights[3] * reward_speed)
-            + (reward_weights[4] * reward_angular_velocity)
+            (self.reward_weights[0] * reward_decreased_distance)
+            + (self.reward_weights[1] * reward_distance)
+            + (self.reward_weights[2] * reward_control)
+            + (self.reward_weights[3] * reward_speed)
+            + (self.reward_weights[4] * reward_angular_velocity)
         )
+        # print(
+        #     reward_decrease_distance,
+        #     reward_distance,
+        #     reward_control,
+        #     reward_speed,
+        #     reward_angular_velocity,
+        # )
+        # print(
+        #     (self.reward_weights[0] * reward_decrease_distance),
+        #     (self.reward_weights[1] * reward_distance),
+        #     (self.reward_weights[2] * reward_control),
+        #     (self.reward_weights[3] * reward_speed),
+        #     (self.reward_weights[4] * reward_angular_velocity),
+        # )
 
         return np.float32(reward)
 

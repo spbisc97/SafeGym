@@ -91,6 +91,8 @@ def test_rgb_graph():
 def test_reward():
     from safegym.envs import Satellite_SE2
     from gymnasium.wrappers.time_limit import TimeLimit
+    from PIL import Image
+    import time
 
     env = Satellite_SE2(
         underactuated=False,
@@ -108,7 +110,13 @@ def test_reward():
             -k @ env.chaser.get_state() * (1)
         )
         rewards.append(reward)
+
         done = term or trunc
+    # X = env.render()
+    # img = Image.fromarray(X)
+    # img.show()
+    time.sleep(0.1)
+
     env.close()
     print("Total reward: ", sum(rewards))
     print("total steps: ", len(rewards))

@@ -30,17 +30,17 @@ XY_PLOT_MAX = np.float32(100)  # [m]
 y0: np.float32 = np.float32(20)  # [m]
 # STARTING_STATE=
 radius: np.float32 = y0  # [m],
-speed: np.float32 = np.float32(radius / 2000)  # [m/s],
+speed_dev: np.float32 = np.float32(0)  # [m/s],
 theta: np.float32 = np.float32(0)  # [rad],
 theta_dot: np.float32 = np.float32(0)  # [rad/s],
 phi: np.float32 = np.float32(0)  # [rad]
 phi_dot: np.float32 = np.float32(0)  # [rad/s]
 STARTING_STATE = np.array(
-    [radius, speed, theta, theta_dot, phi, phi_dot], dtype=np.float32
+    [radius, speed_dev, theta, theta_dot, phi, phi_dot], dtype=np.float32
 )
 
 radius_noise: np.float32 = radius / 2
-speed_noise: np.float32 = speed / 100
+speed_noise_multiplier: np.float32 = np.float32(0.01)
 theta_noise: np.float32 = np.float32(np.pi * 2)
 theta_dot_noise: np.float32 = np.float32(1e-3)
 phi_noise: np.float32 = np.float32(0)
@@ -50,7 +50,7 @@ initial_integraton_steps = np.array([0, 100], dtype=np.int32)
 STARTING_NOISE = np.array(
     [
         radius_noise,
-        speed_noise,
+        speed_noise_multiplier,
         theta_noise,
         theta_dot_noise,
         phi_noise,
@@ -177,8 +177,12 @@ class Satellite_SE2(gym.Env):  # type: ignore
         )
         if radius < 1:
             radius = 1
-        speed = radius / 2000
-        speed = np.random.normal(speed, speed / 10)
+
+        speed_dev = self.starting_state[1]
+        speed_dev_multiplier = self.starting_noise[1]
+        speed = radius / 2000 + speed_dev
+        speed_noise = speed / 10 * speed_dev_multiplier
+        speed = np.random.normal(speed, speed_noise)
 
         theta = np.random.normal(
             self.starting_state[2], self.starting_noise[2]

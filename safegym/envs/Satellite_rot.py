@@ -11,7 +11,7 @@ import gymnasium as gym
 from gymnasium import spaces
 import numpy as np
 from scipy.integrate import odeint, solve_ivp
-  
+
 import random
 import time
 import warnings
@@ -28,7 +28,10 @@ import warnings
 
 I = np.diag(np.array([8.33e-2, 1.08e-1, 4.17e-2], dtype=np.float32))
 invI = np.diag(
-    np.array([12.0048019207683, 9.25925925925926, 23.9808153477218], dtype=np.float32)
+    np.array(
+        [12.0048019207683, 9.25925925925926, 23.9808153477218],
+        dtype=np.float32,
+    )
 )
 
 
@@ -36,9 +39,23 @@ class Satellite_rot(gym.Env):
     metadata = {
         "render_modes": ["rgb_array", "human"],
         "observation_spaces": ["MlpPolicy", "MultiInputPolicy"],
-        "control": ["Ml", "ModelPredictiveControl", "LQR", "PID", "Random", "Human"],
+        "control": [
+            "Ml",
+            "ModelPredictiveControl",
+            "LQR",
+            "PID",
+            "Random",
+            "Human",
+        ],
         "action_spaces": ["continuous", "discrete"],
-        "matplotlib_backend": ["TkAgg", "Qt5Agg", "WXAgg", "GTKAgg", "Qt4Agg", "Agg"],
+        "matplotlib_backend": [
+            "TkAgg",
+            "Qt5Agg",
+            "WXAgg",
+            "GTKAgg",
+            "Qt4Agg",
+            "Agg",
+        ],
     }
 
     def __init__(
@@ -56,9 +73,13 @@ class Satellite_rot(gym.Env):
 
         assert action_space in self.metadata["action_spaces"]
         if action_space == "continuous":
-            self.action_space = spaces.Box(low=-1, high=1, shape=(3,), dtype=np.float32)
+            self.action_space = spaces.Box(
+                low=-1, high=1, shape=(3,), dtype=np.float32
+            )
         else:
-            self.action_space = spaces.Box(low=-1, high=1, shape=(3,), dtype=np.int8)
+            self.action_space = spaces.Box(
+                low=-1, high=1, shape=(3,), dtype=np.int8
+            )
         #   or action_space in self.metadata['action_spaces']
         #   could be  better to use normalized action space
         assert observation_space in self.metadata["observation_spaces"]
@@ -78,10 +99,13 @@ class Satellite_rot(gym.Env):
                 }
             )
         # or render_mode in self.metadata['render_modes']
-        assert render_mode is None or render_mode in self.metadata["render_modes"]
+        assert (
+            render_mode is None or render_mode in self.metadata["render_modes"]
+        )
         self.render_mode = render_mode
         assert (
-            matplotlib_backend in mpl.rcsetup.all_backends or matplotlib_backend is None
+            matplotlib_backend in mpl.rcsetup.all_backends
+            or matplotlib_backend is None
         )
         if matplotlib_backend:
             mpl.use(matplotlib_backend)
@@ -96,7 +120,9 @@ class Satellite_rot(gym.Env):
         truncated = False
         filtered_action = self._action_filter(action)
         self.chaser.rotate(filtered_action)
-        terminated = self._beyond_observational_space()  # or self.chaser.fuel_mass <= 0
+        terminated = (
+            self._beyond_observational_space()
+        )  # or self.chaser.fuel_mass <= 0
         observation = self._get_observation()
         info = self._get_info()
         reward = self._reward_function(action, terminated)
@@ -127,7 +153,9 @@ class Satellite_rot(gym.Env):
         if self.render_mode == "human" or self.render_mode == "rgb_array":
             self.statuses = np.array(self.chaser.state)
             self.norms = np.array([np.linalg.norm(self.chaser.state[0:4])])
-            self.euler_angles = np.array(quaternion_to_euler(self.chaser.state[0:4]))
+            self.euler_angles = np.array(
+                quaternion_to_euler(self.chaser.state[0:4])
+            )
             self.actionss = np.array([]).reshape(0, 3)
             self.rewards = np.array([]).reshape(0, 1)
             self.rewards_sum = np.array([]).reshape(0, 1)
@@ -143,7 +171,9 @@ class Satellite_rot(gym.Env):
         if self.subplots == None:
             if self.render_mode == "human":
                 plt.ion()
-            fig, ax = plt.subplots(4, 3, figsize=(10, 10), layout="constrained")
+            fig, ax = plt.subplots(
+                4, 3, figsize=(10, 10), layout="constrained"
+            )
             lines = np.ma.zeros_like(ax)
             legend = np.array(
                 [
@@ -238,7 +268,9 @@ class Satellite_rot(gym.Env):
         for idx, x in np.ndenumerate(ax):
             ax[idx[0], idx[1]].relim(visible_only=True)
             if idx[0] % 2 != 0:
-                ax[idx[0], idx[1]].autoscale(enable=True, axis="y", tight=False)
+                ax[idx[0], idx[1]].autoscale(
+                    enable=True, axis="y", tight=False
+                )
             ax[idx[0], idx[1]].autoscale(enable=True, axis="x", tight=True)
 
         blit = True
@@ -275,10 +307,14 @@ class Satellite_rot(gym.Env):
     def _remember(self, sta, act, rew, inf={}):
         self.statuses = np.vstack((self.statuses, sta))
         self.norms = np.vstack((self.norms, np.linalg.norm(sta[0:4])))
-        self.euler_angles = np.vstack((self.euler_angles, quaternion_to_euler(sta[:4])))
+        self.euler_angles = np.vstack(
+            (self.euler_angles, quaternion_to_euler(sta[:4]))
+        )
         self.actionss = np.vstack((self.actionss, act))
         self.rewards = np.vstack((self.rewards, rew))
-        prev_rewards = 0 if len(self.rewards_sum) == 0 else self.rewards_sum[-1]
+        prev_rewards = (
+            0 if len(self.rewards_sum) == 0 else self.rewards_sum[-1]
+        )
         self.rewards_sum = np.vstack((self.rewards_sum, prev_rewards + rew))
         self.infos = np.vstack((self.infos, inf))
         self.times = np.vstack((self.times, self.times[-1] + self.chaser.step))
@@ -320,7 +356,9 @@ class Satellite_rot(gym.Env):
         control_effort_term = -1e-2 * np.sum(np.abs(action))
 
         # Stability Term
-        stability_term = -1e-1 * np.dot(self.chaser.state[4:8], self.chaser.state[4:8])
+        stability_term = -1e-1 * np.dot(
+            self.chaser.state[4:8], self.chaser.state[4:8]
+        )
 
         # Smoothness Term
         # smoothness_term = -0.001 * np.linalg.norm(np.gradient(angular_velocity))
@@ -370,7 +408,8 @@ class Chaser:
     I = np.diag(np.array([8.33e-2, 1.08e-1, 4.17e-2], dtype=np.float32))
     invI = np.diag(
         np.array(
-            [12.0048019207683, 9.25925925925926, 23.9808153477218], dtype=np.float32
+            [12.0048019207683, 9.25925925925926, 23.9808153477218],
+            dtype=np.float32,
         )
     )
 
@@ -387,7 +426,7 @@ class Chaser:
         return self.state
 
     @staticmethod  # make this static to compile with numba, and prevent cross slow down
-       # 1/30 of the time when compiled (mostly becaus of cross)
+    # 1/30 of the time when compiled (mostly becaus of cross)
     def _Sat_Rotational_Dyn(t, y, trust):
         def vel_omega(w):
             return np.array(
@@ -423,7 +462,6 @@ class Chaser:
         return dy
 
     @staticmethod
-     
     def omega(q):
         mat = np.array(
             [
@@ -468,9 +506,11 @@ class Chaser:
         return y[-1]
 
     @staticmethod
-    def quaternion_err_rate(q1, qd, w=np.array([0, 0, 0]), wd=np.array([0, 0, 0])):
+    def quaternion_err_rate(
+        q1, qd, w=np.array([0, 0, 0]), wd=np.array([0, 0, 0])
+    ):
         q_e = Chaser.quat_track_err(q1, qd)
-        p = -q_e[1:4] #/ (1.5 - np.dot(q_e[1:4], q_e[1:4]))
+        p = -q_e[1:4]  # / (1.5 - np.dot(q_e[1:4], q_e[1:4]))
         d = wd - w
         kp = q_e[0] * 1e-4 * invI
         kd = 1 * 1e-2
@@ -480,7 +520,9 @@ class Chaser:
     @staticmethod
     def quat_track_err(q1, qd):
         q_inv = Chaser.quat_inv(qd)
-        e = Chaser.omega(q_inv) @ q1  # equal to quaternion_multiply(q1,qd_inv)):
+        e = (
+            Chaser.omega(q_inv) @ q1
+        )  # equal to quaternion_multiply(q1,qd_inv)):
         # e_norm = np.linalg.norm(e)
         # if e_norm > 1.2 or e_norm < 0.8:
         # print("error_norm_error")
@@ -488,7 +530,6 @@ class Chaser:
         return e
 
     @staticmethod
-     
     def quat_inv(q):
         # shouldnt be needed the denominator is always 1
         den = np.dot(q, q)
@@ -496,7 +537,8 @@ class Chaser:
 
 
 # i could use abr_control
- 
+
+
 def eul_to_quat(eul):
     """
     Convert an Euler angle to a quaternion.
@@ -526,7 +568,6 @@ def eul_to_quat(eul):
     return [qw, qx, qy, qz]
 
 
- 
 def quaternion_to_euler(q):
     w, x, y, z = q
     t0 = +2.0 * (w * x + y * z)
@@ -543,9 +584,11 @@ def quaternion_to_euler(q):
 
 
 def test_env():
+    import PIL.Image as Image
+
     env = gym.make(
         "Satellite-rot-v0",
-        render_mode=None,
+        render_mode="rgb_array",
         control="PID",
         matplotlib_backend=None,
     )
@@ -553,13 +596,16 @@ def test_env():
     term = False
     rwds = 0
     t_start = time.time()
-    steps = 1000
+    steps = 5000
     ep = 1
     for j in range(ep):
         print("ep", j)
         obs, info = env.reset()
         while True:
-            action = Chaser.quaternion_err_rate(obs[0:4], info["qd"], w=obs[4:8])
+            action = Chaser.quaternion_err_rate(
+                obs[0:4], info["qd"], w=obs[4:8]
+            )
+            action = np.clip(action, -Chaser.Tmax, Chaser.Tmax)
             # action = env.action_space.sample()
             # action = np.array([0, 1, 0])
             obs, reward, term, trunc, info = env.step(action)
@@ -585,7 +631,9 @@ def test_env():
             if term or trunc:
                 print(term, trunc)
                 x = env.render()
-                # plt.imsave(f"next {j+1}.jpg",x)
+                img = Image.fromarray(x)
+                img.show()
+                img.save(f"last {j+1}.jpg")
                 break
     print(time.time() - t_start)
     env.close()
@@ -616,25 +664,25 @@ def pstats_profiler(fun):
     stats = pstats.Stats(prof).strip_dirs().sort_stats("cumtime")
     stats.print_stats(100)  # top 100 rows
 
+
 def scalene_profiler(fun):
     from scalene import scalene_profiler
+
     scalene_profiler.start()
     fun()
     scalene_profiler.stop()
 
 
+# try:
+#     from numba import jit_module
 
-try:
-    from numba import jit_module
+#     jit_module(error_model="numpy")
+#     print("Using Numba optimised methods.")
 
-    jit_module(nopython=True, error_model="numpy")
-    print("Using Numba optimised methods.")
+# except ModuleNotFoundError:
+#     print("Using native Python methods.")
+#     print("Consider installing numba for compiled and parallelised methods.")
 
-except ModuleNotFoundError:
-    print("Using native Python methods.")
-    print("Consider installing numba for compiled and parallelised methods.")
-
-    
 
 if __name__ == "__main__":
     from stable_baselines3 import PPO
@@ -652,7 +700,8 @@ if __name__ == "__main__":
 
     check_env(Satellite_rot(), warn=True)
     print("env checked")
-    #test_env()
-    #snakeviz_profiler(test_env)
-    
-    #scalene_profiler(test_env)
+    test_env()
+
+    # snakeviz_profiler(test_env)
+
+    # scalene_profiler(test_env)

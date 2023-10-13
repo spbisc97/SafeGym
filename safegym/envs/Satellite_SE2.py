@@ -23,9 +23,9 @@ STEP: np.float32 = np.float32(0.05)  # [s]
 VROT_MAX = np.float32(2 * np.pi)  # [rad/s]
 VTRANS_MAX = np.float32(50)  # [m/s]
 
-XY_MAX = np.float32(100)  # [m]
+XY_MAX = np.float32(50)  # [m]
 
-XY_PLOT_MAX = np.float32(100)  # [m]
+XY_PLOT_MAX = np.float32(50)  # [m]
 
 y0: np.float32 = np.float32(20)  # [m]
 # STARTING_STATE=
@@ -59,7 +59,7 @@ STARTING_NOISE = np.array(
     dtype=np.float32,
 )
 # REWARD_WEIGHTS = distance_decrease,distance,action,speed,angle_speed
-REWARD_WEIGHTS = np.array([10, 0.8, 0.5, 1, 20], dtype=np.float32)
+REWARD_WEIGHTS = np.array([30, 0.5, 0.5, 1, 20], dtype=np.float32)
 EULER_SPEEDUP = True
 
 
@@ -377,7 +377,7 @@ class Satellite_SE2(gym.Env):  # type: ignore
 
         self.axs[5].plot(
             self.reward_history,
-            label="Reward",
+            label=f"Reward{sum(self.reward_history):.2e}",
             linestyle=None,
             marker=".",
             markersize=1,

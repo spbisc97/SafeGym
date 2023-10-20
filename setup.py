@@ -9,8 +9,7 @@ from setuptools import setup, find_packages
 setup(
     name="safegym",
     version="0.12",
-    packages=find_packages("safegym"),
-    package_data={"": ["typed.py"]},
+    packages=find_packages(""),
     install_requires=[
         "numpy>=1.10",
         "gymnasium",

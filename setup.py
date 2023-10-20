@@ -7,8 +7,8 @@ from setuptools import setup, find_packages
 
 
 setup(
-    name="SafeGym",
-    version="0.1",
+    name="safegym",
+    version="0.11",
     packages=find_packages(),
     package_data={"safegym": ["typed.py"]},
     install_requires=[

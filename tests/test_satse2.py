@@ -93,6 +93,7 @@ def test_reward():
     from gymnasium.wrappers.time_limit import TimeLimit
     from PIL import Image
     import time
+    from matplotlib import pyplot as plt
 
     env = Satellite_SE2(
         underactuated=False,
@@ -115,11 +116,39 @@ def test_reward():
     # X = env.render()
     # img = Image.fromarray(X)
     # img.show()
-    time.sleep(0.1)
+    time.sleep(0.001)
 
     env.close()
+    # plt.switch_backend("`")
     print("Total reward: ", sum(rewards))
     print("total steps: ", len(rewards))
+    # plt.subplot(4, 1, 1)
+    # plt.plot([1, 3, 7], [4, 6, -1])
+    # plt.show()
+    # plt.subplot(4, 1, 2)
+
+    # plt.plot(np.array(rewards))
+    # plt.show()
+    # plt.subplot(4, 1, 3)
+    # time.sleep(5)
+    seprew = np.array(env.separate_reward_history)
+    print(seprew[:, 1].shape)
+    plt.ioff()
+    plt.subplot(2, 1, 1)
+    plt.plot(seprew[:, 0], label="rel_distance")
+    plt.plot(seprew[:, 1], label="distance")
+    plt.plot(seprew[:, 2], label="control")
+    plt.plot(seprew[:, 3], label="speed")
+    plt.plot(seprew[:, 4], label="angle_speed")
+    plt.legend()
+    plt.subplot(2, 1, 2)
+    plt.plot(rewards[0:-1], label="total")
+    plt.legend()
+
+    plt.show()
+
+    plt.close("all")  # <--- added
+    time.sleep(5)
 
 
 def test_trajectory():
@@ -184,4 +213,4 @@ if __name__ == "__main__":
     import sys
 
     sys.path.append("..")
-    profile()
+    test_reward()

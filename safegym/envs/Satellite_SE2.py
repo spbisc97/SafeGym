@@ -59,7 +59,7 @@ STARTING_NOISE = np.array(
     dtype=np.float32,
 )
 # REWARD_WEIGHTS = distance_decrease,distance,action,speed,angle_speed
-REWARD_WEIGHTS = np.array([30, 0.5, 0.5, 1, 20], dtype=np.float32)
+REWARD_WEIGHTS = np.array([1000, 0.5, 0.3, 1, 30], dtype=np.float32)
 EULER_SPEEDUP = True
 
 
@@ -157,6 +157,7 @@ class Satellite_SE2(gym.Env):  # type: ignore
         self.state_history = []
         self.action_history = []
         self.reward_history = []
+        self.separate_reward_history = []
         self.time_step = -1
 
         self.build_action_space()
@@ -223,13 +224,19 @@ class Satellite_SE2(gym.Env):  # type: ignore
         self.action_history = []
         self.state_history = []
         self.reward_history = []
+        self.separate_reward_history = []
         self.time_step = 0
         self.terminated = False
         self.truncated = False
         self.is_success = False
+        self.is_unsafe = False
         observation = self.__get_observation()
         self.xy_plot_lim = self.chaser.radius() * 2
-        info = {"is_success": self.is_success, "time_step": self.time_step}
+        info = {
+            "is_success": self.is_success,
+            "time_step": self.time_step,
+            "is_unsafe": self.is_unsafe,
+        }
         return observation, info
 
     def step(
@@ -243,7 +250,11 @@ class Satellite_SE2(gym.Env):  # type: ignore
         observation = self.__get_observation()
         reward = self._reward_function()  # Compute the reward
         self.time_step += 1  # Increment the time_step at each step.
-        info = {"is_success": self.is_success, "time_step": self.time_step}
+        info = {
+            "is_success": self.is_success,
+            "time_step": self.time_step,
+            "is_unsafe": self.is_unsafe,
+        }
         # "action": action,
         # "observation": observation,
         # "reward": reward,}
@@ -571,6 +582,7 @@ class Satellite_SE2(gym.Env):  # type: ignore
                     * (1 / (ch_speed + 1e-4))
                 )
             if self.crash():
+                self.is_unsafe = True
                 return np.float32(-5000 * (ch_speed + 1e-4))
 
         if self.out_of_bounds():
@@ -586,11 +598,10 @@ class Satellite_SE2(gym.Env):  # type: ignore
             ) - ch_radius
         else:
             reward_decreased_distance = 0
-        reward_decreased_distance = reward_decreased_distance * (
-            self.xy_max / (ch_radius + 1e-4)
-        )
+        reward_decreased_distance = reward_decreased_distance / self.xy_max
 
-        reward_distance = -ch_radius / (self.xy_max)
+        normalized_distance = ch_radius / self.xy_max
+        reward_distance = -normalized_distance
 
         # Encourage the agent to minimize control effort, with normalization
         reward_control = -np.linalg.norm(ch_control) / (FTMAX)
@@ -603,6 +614,16 @@ class Satellite_SE2(gym.Env):  # type: ignore
 
         # i could add a reward for the angle between the chaser and the target
         # i coudl add reward_weights to init function
+        # give steps rewards
+        extra_reward = 0
+        if normalized_distance < 0.7:
+            extra_reward += 1
+            if normalized_distance < 0.4:
+                extra_reward += 1
+                if normalized_distance < 0.2:
+                    extra_reward += 1
+        extra_reward_weight = 0.5
+        extra_reward = extra_reward * extra_reward_weight
 
         # Combine
         reward = (
@@ -611,6 +632,7 @@ class Satellite_SE2(gym.Env):  # type: ignore
             + (self.reward_weights[2] * reward_control)
             + (self.reward_weights[3] * reward_speed)
             + (self.reward_weights[4] * reward_angular_velocity)
+            + extra_reward
         )
         # print(
         #     reward_decrease_distance,
@@ -627,6 +649,16 @@ class Satellite_SE2(gym.Env):  # type: ignore
         #     (self.reward_weights[4] * reward_angular_velocity),
         # )
 
+        self.separate_reward_history.append(
+            [
+                (self.reward_weights[0] * reward_decreased_distance),
+                (self.reward_weights[1] * reward_distance),
+                (self.reward_weights[2] * reward_control),
+                (self.reward_weights[3] * reward_speed),
+                (self.reward_weights[4] * reward_angular_velocity),
+                extra_reward,
+            ]
+        )
         return np.float32(reward)
 
     def _reward_shaping(self):
@@ -635,8 +667,10 @@ class Satellite_SE2(gym.Env):  # type: ignore
     def out_of_bounds(self):
         chaser_state = self.chaser.get_state()
         if np.abs(chaser_state[0]) > self.xy_max:
+            self.is_unsafe = True
             return True
         if np.abs(chaser_state[1]) > self.xy_max:
+            self.is_unsafe = True
             return True
 
         if np.abs(chaser_state[3]) > self.vtrans_max:

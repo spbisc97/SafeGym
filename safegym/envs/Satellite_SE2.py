@@ -207,7 +207,7 @@ class Satellite_SE2(gym.Env):  # type: ignore
                 0,  # vy
                 omega,  # omega
             ),
-            dtype=np.float32,
+            # dtype=np.float32, #not working bevore np 1.24
         )
         target_random = np.random.normal(
             self.starting_state[4:6], self.starting_noise[4:6]

@@ -10,7 +10,7 @@ setup(
     name="safegym",
     version="0.11",
     packages=find_packages(),
-    package_data={"safegym": ["typed.py"]},
+    package_data={"": ["typed.py"]},
     install_requires=[
         "numpy>=1.10",
         "gymnasium",

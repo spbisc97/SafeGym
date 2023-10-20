@@ -91,7 +91,6 @@ def test_rgb_graph():
 def test_reward():
     from safegym.envs import Satellite_SE2
     from gymnasium.wrappers.time_limit import TimeLimit
-    from PIL import Image
     import time
     from matplotlib import pyplot as plt
 
@@ -107,9 +106,8 @@ def test_reward():
     rewards = []
     done = False
     while not done:
-        obs, reward, trunc, term, info = env.step(
-            -k @ env.chaser.get_state() * (1)
-        )
+        action = (-k @ env.chaser.get_state()).astype(np.float32)
+        obs, reward, trunc, term, info = env.step(action)
         rewards.append(reward)
 
         done = term or trunc
@@ -148,7 +146,6 @@ def test_reward():
     plt.show()
 
     plt.close("all")  # <--- added
-    time.sleep(5)
 
 
 def test_trajectory():

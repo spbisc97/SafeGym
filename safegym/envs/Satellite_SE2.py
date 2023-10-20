@@ -23,11 +23,11 @@ STEP: np.float32 = np.float32(0.05)  # [s]
 VROT_MAX = np.float32(2 * np.pi)  # [rad/s]
 VTRANS_MAX = np.float32(50)  # [m/s]
 
-XY_MAX = np.float32(30)  # [m]
+XY_MAX = np.float32(8)  # [m]
 
-XY_PLOT_MAX = np.float32(30)  # [m]
+XY_PLOT_MAX = np.float32(8)  # [m]
 
-y0: np.float32 = np.float32(15)  # [m]
+y0: np.float32 = np.float32(5)  # [m]
 # STARTING_STATE=
 radius: np.float32 = y0  # [m],
 speed_dev: np.float32 = np.float32(0)  # [m/s],
@@ -59,7 +59,7 @@ STARTING_NOISE = np.array(
     dtype=np.float32,
 )
 # REWARD_WEIGHTS = distance_decrease,distance,action,speed,angle_speed
-REWARD_WEIGHTS = np.array([1000, 0.5, 0.3, 1, 30], dtype=np.float32)
+REWARD_WEIGHTS = np.array([1000, 0.1, 0.3, 1, 30], dtype=np.float32)
 EULER_SPEEDUP = True
 
 
@@ -209,6 +209,7 @@ class Satellite_SE2(gym.Env):  # type: ignore
             ),
             # dtype=np.float32, #not working bevore np 1.24
         )
+        np.array(chaser_stable_random, dtype=np.float32)
         target_random = np.random.normal(
             self.starting_state[4:6], self.starting_noise[4:6]
         ).astype(np.float32)

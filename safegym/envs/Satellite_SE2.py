@@ -23,9 +23,9 @@ STEP: np.float32 = np.float32(0.05)  # [s]
 VROT_MAX = np.float32(2 * np.pi)  # [rad/s]
 VTRANS_MAX = np.float32(50)  # [m/s]
 
-XY_MAX = np.float32(50)  # [m]
+XY_MAX = np.float32(30)  # [m]
 
-XY_PLOT_MAX = np.float32(50)  # [m]
+XY_PLOT_MAX = np.float32(30)  # [m]
 
 y0: np.float32 = np.float32(15)  # [m]
 # STARTING_STATE=

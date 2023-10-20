@@ -27,7 +27,7 @@ XY_MAX = np.float32(50)  # [m]
 
 XY_PLOT_MAX = np.float32(50)  # [m]
 
-y0: np.float32 = np.float32(20)  # [m]
+y0: np.float32 = np.float32(15)  # [m]
 # STARTING_STATE=
 radius: np.float32 = y0  # [m],
 speed_dev: np.float32 = np.float32(0)  # [m/s],
@@ -39,7 +39,7 @@ STARTING_STATE = np.array(
     [radius, speed_dev, theta, theta_dot, phi, phi_dot], dtype=np.float32
 )
 
-radius_noise: np.float32 = radius / 2
+radius_noise: np.float32 = radius / 5
 speed_noise_multiplier: np.float32 = np.float32(0.01)
 theta_noise: np.float32 = np.float32(np.pi * 2)
 theta_dot_noise: np.float32 = np.float32(1e-3)

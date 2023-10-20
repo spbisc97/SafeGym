@@ -6,12 +6,17 @@ from setuptools import setup, find_packages
 # ext_modules = [Extension("*",["./safegym/envs/*.py"],include_dirs=[numpy.get_include()])]
 
 
+import pathlib
+
+CWD = pathlib.Path(__file__).absolute().parent
+
+
 setup(
     name="safegym",
     version="0.12",
-    packages=find_packages(""),
+    include_dirs=["safegym", "safegym.*"],
     install_requires=[
-        "numpy>=1.10",
+        "numpy>=1.23",
         "gymnasium",
     ],
     # Metadata

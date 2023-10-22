@@ -114,7 +114,7 @@ def test_reward():
     # X = env.render()
     # img = Image.fromarray(X)
     # img.show()
-    time.sleep(0.001)
+    time.sleep(0.00001)
 
     env.close()
     # plt.switch_backend("`")

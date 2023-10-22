@@ -4,10 +4,31 @@ import numpy as np
 from typing import Any, Optional, SupportsFloat, Tuple
 import matplotlib
 import matplotlib.pyplot as plt
+import matplotlib.style as mplstyle
 from matplotlib.patches import Circle
 import warnings
 
+# matplotlib.use(
+#     "TKAgg"
+# )  # Or 'Qt5Cairo' or 'Qt4Cairo' if you're using PyQt/PySide
+
+
+# matplotlib.rcParams["patch.force_edgecolor"] = True
 matplotlib.rcParams["figure.raise_window"] = False
+# matplotlib.rcParams["path.simplify"] = True
+# # pltstyle = ["ggplot"]
+
+# pltstyle = [
+#     style
+#     for style in mplstyle.available
+#     if (("seaborn" and "paper") in style)
+#     or (("seaborn" and "colorblind") in style)
+#     or (("seaborn" and "whitegrid") in style)
+# ]
+# pltstyle.append("fast")
+
+# mplstyle.use(pltstyle)
+
 
 INERTIA = 4.17e-2  # [kg*m^2]
 INERTIA_INV = 23.9808  # 1/INERTIA
@@ -355,6 +376,8 @@ class Satellite_SE2(gym.Env):  # type: ignore
             ax.clear()
         # State history to numpy array
         state_history = np.array(self.state_history)
+        if self.time_step < 1:
+            return
         # Plot positions
         self.axs[0].plot(state_history[:, 0], label="x position")
         self.axs[0].plot(state_history[:, 1], label="y position")
@@ -368,12 +391,12 @@ class Satellite_SE2(gym.Env):  # type: ignore
         # Plot angle
         self.axs[2].plot(state_history[:, 2], label="Chaser Angle")
         self.axs[2].plot(state_history[:, 6], label="Target Angle")
-        self.axs[2].set_ylabel("Angle (radians)")
+        self.axs[2].set_ylabel("Angle (rad)")
         self.axs[2].legend(loc="upper right")
         # Plot angle speed
         self.axs[3].plot(state_history[:, 5], label="Chaser Angular Velocity")
         self.axs[3].plot(state_history[:, 7], label="Target Angular Velocity")
-        self.axs[3].set_ylabel("Angular velocity (radians/s)")
+        self.axs[3].set_ylabel("Angular velocity (rad/s)")
         self.axs[3].legend(loc="upper right")
         # Plot actions
         self.axs[4].plot(
@@ -1271,7 +1294,7 @@ def _test8():
 
     env = Satellite_SE2(
         underactuated=True,
-        render_mode="human",
+        render_mode="rgb_array",
         step=np.float32(0.05),
     )
     observation, info = env.reset()

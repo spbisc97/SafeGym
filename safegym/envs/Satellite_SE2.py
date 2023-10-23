@@ -61,9 +61,9 @@ STARTING_STATE = np.array(
 )
 
 radius_noise: np.float32 = radius / 5
-speed_noise_multiplier: np.float32 = np.float32(0.01)
-theta_noise: np.float32 = np.float32(np.pi * 2)
-theta_dot_noise: np.float32 = np.float32(1e-3)
+speed_noise_multiplier: np.float32 = np.float32(1e-4)
+theta_noise: np.float32 = np.float32(np.pi * 1e-6)
+theta_dot_noise: np.float32 = np.float32(1e-6)
 phi_noise: np.float32 = np.float32(0)
 phi_dot_noise: np.float32 = np.float32(0)
 INITIAL_INTEGRATION_STEPS = np.array([0, 100], dtype=np.int32)

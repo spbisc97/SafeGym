@@ -59,11 +59,11 @@ STEP: np.float32 = np.float32(0.05)  # [s]
 VROT_MAX = np.float32(2 * np.pi)  # [rad/s]
 VTRANS_MAX = np.float32(50)  # [m/s]
 
-XY_MAX = np.float32(50)  # [m]
+XY_MAX = np.float32(20)  # [m]
 
-XY_PLOT_MAX = np.float32(50)  # [m]
+XY_PLOT_MAX = np.float32(20)  # [m]
 
-y0: np.float32 = np.float32(30)  # [m]
+y0: np.float32 = np.float32(10)  # [m]
 # STARTING_STATE=
 radius: np.float32 = y0  # [m],
 theta: np.float32 = np.float32(0)  # [rad],
@@ -598,7 +598,7 @@ class Satellite_SE2(gym.Env):  # type: ignore
                 return np.float32(-5000 * (ch_speed + 1e-4))
 
         if self.out_of_bounds():
-            self.truncated = True
+            self.terminated = True
             return np.float32(-1000)
 
         # for shaping i could add a reward for the radius lowering
@@ -616,7 +616,7 @@ class Satellite_SE2(gym.Env):  # type: ignore
         reward_distance = -normalized_distance
 
         # Encourage the agent to minimize control effort, with normalization
-        reward_control = -np.linalg.norm(ch_control) / (FTMAX)
+        reward_control = -np.linalg.norm(ch_control / self.max_action)
 
         # Encourage the agent to maintain low speed
         reward_speed = -ch_speed / (VTRANS_MAX)

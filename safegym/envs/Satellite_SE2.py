@@ -13,10 +13,10 @@ import warnings
 # )  # Or 'Qt5Cairo' or 'Qt4Cairo' if you're using PyQt/PySide
 
 
-# matplotlib.rcParams["patch.force_edgecolor"] = True
+matplotlib.rcParams["patch.force_edgecolor"] = True
 matplotlib.rcParams["figure.raise_window"] = False
 mplstyle.use("fast")
-# matplotlib.rcParams["path.simplify"] = True
+matplotlib.rcParams["path.simplify"] = True
 # # pltstyle = ["ggplot"]
 
 
@@ -59,11 +59,11 @@ STEP: np.float32 = np.float32(0.05)  # [s]
 VROT_MAX = np.float32(2 * np.pi)  # [rad/s]
 VTRANS_MAX = np.float32(50)  # [m/s]
 
-XY_MAX = np.float32(20)  # [m]
+XY_MAX = np.float32(10)  # [m]
 
-XY_PLOT_MAX = np.float32(20)  # [m]
+XY_PLOT_MAX = np.float32(10)  # [m]
 
-y0: np.float32 = np.float32(10)  # [m]
+y0: np.float32 = np.float32(5)  # [m]
 # STARTING_STATE=
 radius: np.float32 = y0  # [m],
 theta: np.float32 = np.float32(0)  # [rad],

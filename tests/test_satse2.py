@@ -107,6 +107,7 @@ def test_reward():
     done = False
     while not done:
         action = (-k @ env.chaser.get_state()).astype(np.float32)
+        np.clip(action, -1, 1, out=action)
         obs, reward, trunc, term, info = env.step(action)
         rewards.append(reward)
 
@@ -132,6 +133,72 @@ def test_reward():
     seprew = np.array(env.separate_reward_history)
     print(seprew[:, 1].shape)
     plt.ioff()
+    plt.subplot(2, 1, 1)
+    plt.plot(seprew[:, 0], label="rel_distance")
+    plt.plot(seprew[:, 1], label="distance")
+    plt.plot(seprew[:, 2], label="control")
+    plt.plot(seprew[:, 3], label="speed")
+    plt.plot(seprew[:, 4], label="angle_speed")
+    plt.legend()
+    plt.subplot(2, 1, 2)
+    plt.plot(rewards[0:-1], label="total")
+    plt.legend()
+
+    plt.show()
+
+    plt.close("all")  # <--- added
+
+
+def test_reward_doubleint():
+    from safegym.envs import Satellite_SE2
+    from gymnasium.wrappers.time_limit import TimeLimit
+    import time
+    from matplotlib import pyplot as plt
+
+    env = Satellite_SE2(
+        underactuated=False,
+        render_mode="human",
+        max_action=np.float32(1),
+        step=np.float32(0.1),
+        unconstrained=True,
+        doubleintegrator=True,
+    )
+    TimeLimit(env, max_episode_steps=10000)
+    env.reset()
+    rewards = []
+    done = False
+    while not done:
+        action = (
+            -0.0001 * env.chaser.get_state()[0:3]
+            - 0.1 * env.chaser.get_state()[3:6]
+        ).astype(np.float32)
+        np.clip(action, -1, 1, out=action)
+        obs, reward, trunc, term, info = env.step(action)
+        rewards.append(reward)
+
+        done = term or trunc
+    # X = env.render()
+    # img = Image.fromarray(X)
+    # img.show()
+    time.sleep(0.00001)
+
+    env.close()
+    # plt.switch_backend("`")
+    print("Total reward: ", sum(rewards))
+    print("total steps: ", len(rewards))
+    # plt.subplot(4, 1, 1)
+    # plt.plot([1, 3, 7], [4, 6, -1])
+    # plt.show()
+    # plt.subplot(4, 1, 2)
+
+    # plt.plot(np.array(rewards))
+    # plt.show()
+    # plt.subplot(4, 1, 3)
+    # time.sleep(5)
+    seprew = np.array(env.separate_reward_history)
+    print(seprew[:, 1].shape)
+    plt.ioff()
+
     plt.subplot(2, 1, 1)
     plt.plot(seprew[:, 0], label="rel_distance")
     plt.plot(seprew[:, 1], label="distance")

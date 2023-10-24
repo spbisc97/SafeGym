@@ -19,6 +19,7 @@ mplstyle.use("fast")
 # matplotlib.rcParams["path.simplify"] = True
 # # pltstyle = ["ggplot"]
 
+
 # pltstyle = [
 #     style
 #     for style in mplstyle.available
@@ -27,6 +28,19 @@ mplstyle.use("fast")
 #     or (("seaborn" and "whitegrid") in style)
 # ]
 # pltstyle.append("fast")
+@staticmethod
+def generate_stable_trajectory(
+    radius: np.float32, theta: np.float32, theta_dot: np.float32
+) -> np.ndarray[tuple[int], np.dtype[np.float32]]:
+    state = np.zeros((6,), dtype=np.float32)
+    state[0] = 0  # x
+    state[1] = radius  # y
+    state[2] = theta  # theta
+    state[3] = radius / 2000  # vx
+    state[4] = 0  # vy
+    state[5] = theta_dot  # omega
+    return state
+
 
 # mplstyle.use(pltstyle)
 
@@ -45,43 +59,35 @@ STEP: np.float32 = np.float32(0.05)  # [s]
 VROT_MAX = np.float32(2 * np.pi)  # [rad/s]
 VTRANS_MAX = np.float32(50)  # [m/s]
 
-XY_MAX = np.float32(6)  # [m]
+XY_MAX = np.float32(50)  # [m]
 
-XY_PLOT_MAX = np.float32(6)  # [m]
+XY_PLOT_MAX = np.float32(50)  # [m]
 
-y0: np.float32 = np.float32(4)  # [m]
+y0: np.float32 = np.float32(30)  # [m]
 # STARTING_STATE=
 radius: np.float32 = y0  # [m],
-speed_dev: np.float32 = np.float32(0)  # [m/s],
 theta: np.float32 = np.float32(0)  # [rad],
 theta_dot: np.float32 = np.float32(0)  # [rad/s],
 phi: np.float32 = np.float32(0)  # [rad]
 phi_dot: np.float32 = np.float32(0)  # [rad/s]
-STARTING_STATE = np.array(
-    [radius, speed_dev, theta, theta_dot, phi, phi_dot], dtype=np.float32
-)
 
-radius_noise: np.float32 = radius / 5
-speed_noise_multiplier: np.float32 = np.float32(1e-4)
-theta_noise: np.float32 = np.float32(np.pi * 1e-6)
-theta_dot_noise: np.float32 = np.float32(1e-6)
-phi_noise: np.float32 = np.float32(0)
-phi_dot_noise: np.float32 = np.float32(0)
-INITIAL_INTEGRATION_STEPS = np.array([0, 100], dtype=np.int32)
+
+STARTING_STATE_CHASER = generate_stable_trajectory(
+    radius=y0, theta=theta, theta_dot=theta_dot
+)
+STARTING_STATE_TARGET = np.array([phi, phi_dot], dtype=np.float32)
+
+STARTING_STATE = np.concatenate(
+    [STARTING_STATE_CHASER, STARTING_STATE_TARGET], dtype=np.float32
+)
+INITIAL_INTEGRATION_STEPS = np.array(object=[0, 0], dtype=np.int32)
 
 STARTING_NOISE = np.array(
-    [
-        radius_noise,
-        speed_noise_multiplier,
-        theta_noise,
-        theta_dot_noise,
-        phi_noise,
-        phi_dot_noise,
-    ],
+    [0, 0, 0, 0, 0, 0, 0, 0],
     dtype=np.float32,
 )
 # REWARD_WEIGHTS = distance_decrease,distance,action,speed,angle_speed
-REWARD_WEIGHTS = np.array([1000, 0.1, 0.3, 1, 30], dtype=np.float32)
+REWARD_WEIGHTS = np.array([100, 0.1, 0.3, 1, 10], dtype=np.float32)
 EULER_SPEEDUP = True
 
 
@@ -203,50 +209,28 @@ class Satellite_SE2(gym.Env):  # type: ignore
     ) -> tuple[Any, dict[str, Any]]:
         super().reset(seed=seed, options=options)
 
-        radius = np.random.normal(
-            self.starting_state[0], self.starting_noise[0]
-        )
-        if radius < 1:
-            radius = 1
-
-        speed_dev = self.starting_state[1]
-        speed_dev_multiplier = self.starting_noise[1]
-        speed = radius / 2000 + speed_dev
-        speed_noise = speed / 10 * speed_dev_multiplier
-        speed = np.random.normal(speed, speed_noise)
-
-        theta = np.random.normal(
-            self.starting_state[2], self.starting_noise[2]
-        )
-        omega = np.random.normal(
-            self.starting_state[3], self.starting_noise[3]
+        random_state = np.random.normal(
+            self.starting_state, self.starting_noise
         )
 
-        # set a stable initial trajectory
-        chaser_stable_random = np.hstack(
-            (
-                0,  # x
-                radius,  # y
-                theta,  # theta
-                speed,  # vx
-                0,  # vy
-                omega,  # omega
-            ),
-            # dtype=np.float32, #not working bevore np 1.24
-        )
-        np.array(chaser_stable_random, dtype=np.float32)
-        target_random = np.random.normal(
-            self.starting_state[4:6], self.starting_noise[4:6]
-        ).astype(np.float32)
+        chaser_starting_state = np.array(random_state[0:6], dtype=np.float32)
+        target_starting_state = np.array(random_state[6:8], dtype=np.float32)
 
-        self.chaser.reset(chaser_stable_random)
+        self.chaser.reset(chaser_starting_state)
+        if (
+            self.initial_integration_steps[0]
+            == self.initial_integration_steps[1]
+        ):
+            self.initial_integration_steps[1] = (
+                self.initial_integration_steps[0] + 1
+            )
         action_free_steps = np.random.randint(
             self.initial_integration_steps[0],
             self.initial_integration_steps[1],
         )
         for i in range(0, action_free_steps):
             self.chaser.step()
-        self.target.reset(target_random)
+        self.target.reset(target_starting_state)
         self.action_history = []
         self.state_history = []
         self.reward_history = []
@@ -269,7 +253,7 @@ class Satellite_SE2(gym.Env):  # type: ignore
         self, action: np.ndarray
     ) -> tuple[Any, np.float32, bool, bool, dict[str, Any]]:
         if not self.action_space.contains(action):
-            raise Exception(f"{action!r} ({type(action)}) invalid")
+            raise Exception(f"{action!r} invalid")
         assert self.time_step != -1, "Must reset environment first"
         self.chaser.set_control(self.__action_filter(action))
         self.chaser.step()
@@ -787,6 +771,19 @@ class Satellite_SE2(gym.Env):  # type: ignore
                 low=-abs_lim, high=abs_lim, shape=(10,), dtype=np.float32
             )
             self.__get_observation = self.__get_absolute_observation
+
+    @staticmethod
+    def generate_stable_trajectory(
+        radius: np.float32, theta: np.float32, theta_dot: float
+    ) -> np.ndarray[tuple[int], np.dtype[np.float32]]:
+        state = np.zeros((6,), dtype=np.float32)
+        state[0] = 0  # x
+        state[1] = radius  # y
+        state[2] = theta  # theta
+        state[3] = radius / 2000  # vx
+        state[4] = 0  # vy
+        state[5] = theta_dot  # omega
+        return state
 
     class Chaser:
         """Chaser class for the satellite environment."""

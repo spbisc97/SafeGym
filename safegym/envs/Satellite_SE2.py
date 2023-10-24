@@ -15,6 +15,7 @@ import warnings
 
 # matplotlib.rcParams["patch.force_edgecolor"] = True
 matplotlib.rcParams["figure.raise_window"] = False
+mplstyle.use("fast")
 # matplotlib.rcParams["path.simplify"] = True
 # # pltstyle = ["ggplot"]
 
@@ -147,6 +148,7 @@ class Satellite_SE2(gym.Env):  # type: ignore
         reward_weights: np.ndarray[
             tuple[int], np.dtype[np.float32]
         ] = REWARD_WEIGHTS,
+        doubleintegrator: bool = False,
     ):
         super(Satellite_SE2, self).__init__()
         assert isinstance(underactuated, bool)
@@ -187,7 +189,9 @@ class Satellite_SE2(gym.Env):  # type: ignore
 
         self.steps_beyond_done = None
         self.chaser = self.Chaser(
-            underactuated=underactuated, step=self.__step
+            underactuated=underactuated,
+            step=self.__step,
+            doubleintegrator=doubleintegrator,
         )
         self.target = self.Target()
         self.reset()
@@ -794,6 +798,7 @@ class Satellite_SE2(gym.Env):  # type: ignore
                 np.ndarray[tuple[int], np.dtype[np.float32]]
             ] = None,
             underactuated: bool = True,
+            doubleintegrator: bool = False,
         ):
             self.__step = step
             if state is None:
@@ -804,12 +809,22 @@ class Satellite_SE2(gym.Env):  # type: ignore
             self.underactuated = underactuated
 
             if underactuated:
-                self.__sat_dyn = self.__sat_dyn_underactuated
+                if doubleintegrator:
+                    self.__sat_dyn = (
+                        self.__sat_dyn_underactuated_doubleintegrator
+                    )
+                else:
+                    self.__sat_dyn = self.__sat_dyn_underactuated
 
                 self.control = np.zeros((2,), dtype=np.float32)
                 self.control_space = 2  # avoid gym space check
             else:
-                self.__sat_dyn = self.__sat_dyn_fullyactuated
+                if doubleintegrator:
+                    self.__sat_dyn = (
+                        self.__sat_dyn_fullyactuated_doubleintegrator
+                    )
+                else:
+                    self.__sat_dyn = self.__sat_dyn_fullyactuated
 
                 self.control = np.zeros((3,), dtype=np.float32)
                 self.control_space = 3  # avoid gym space check
@@ -877,6 +892,21 @@ class Satellite_SE2(gym.Env):  # type: ignore
 
             return dw
 
+        def __sat_dyn_underactuated_doubleintegrator(
+            self,
+            t: SupportsFloat,
+            w: np.ndarray[tuple[int], np.dtype[np.float32]],
+            u: np.ndarray[tuple[int], np.dtype[np.float32]],
+        ):
+            dw = np.zeros((6,), dtype=np.float32)
+            dw[0] = w[3]
+            dw[1] = w[4]
+            dw[2] = w[5]
+            dw[3] = (np.cos(w[2])) * u[0] / MASS
+            dw[4] = (np.sin(w[2])) * u[0] / MASS
+            dw[5] = INERTIA_INV * u[1]
+            return dw
+
         def __sat_dyn_fullyactuated(
             self,
             t: SupportsFloat,
@@ -895,6 +925,21 @@ class Satellite_SE2(gym.Env):  # type: ignore
             dw[3] = (3 * (NU**2) * w[0]) + (2 * NU * w[4]) + (u[0] / MASS)
 
             dw[4] = (-2 * NU * w[3]) + (u[1] / MASS)
+            dw[5] = INERTIA_INV * u[2]
+            return dw
+
+        def __sat_dyn_fullyactuated_doubleintegrator(
+            self,
+            t: SupportsFloat,
+            w: np.ndarray[tuple[int], np.dtype[np.float32]],
+            u: np.ndarray[tuple[int], np.dtype[np.float32]],
+        ):
+            dw = np.zeros((6,), dtype=np.float32)
+            dw[0] = w[3]
+            dw[1] = w[4]
+            dw[2] = w[5]
+            dw[3] = u[0] / MASS
+            dw[4] = u[1] / MASS
             dw[5] = INERTIA_INV * u[2]
             return dw
 

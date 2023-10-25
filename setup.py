@@ -21,8 +21,8 @@ setup(
     ],
     # Metadata
     author="Simone Rotondi",
-    # author_email=,
-    # description=,
+    author_email="rotondi97simone@gmail.com",
+    description="Gymnasium Compatible Safe RL Environments",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
     url="https://github.com/spbisc97/SafeGym",

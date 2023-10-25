@@ -1,3 +1,4 @@
 __pycache__/
 safegym.egg-info/
 Speedtest.ipynb
+dist/

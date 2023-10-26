@@ -59,11 +59,11 @@ STEP: np.float32 = np.float32(0.05)  # [s]
 VROT_MAX = np.float32(2 * np.pi)  # [rad/s]
 VTRANS_MAX = np.float32(50)  # [m/s]
 
-XY_MAX = np.float32(10)  # [m]
+XY_MAX = np.float32(5)  # [m]
 
-XY_PLOT_MAX = np.float32(10)  # [m]
+XY_PLOT_MAX = np.float32(5)  # [m]
 
-y0: np.float32 = np.float32(5)  # [m]
+y0: np.float32 = np.float32(2.5)  # [m]
 # STARTING_STATE=
 radius: np.float32 = y0  # [m],
 theta: np.float32 = np.float32(0)  # [rad],

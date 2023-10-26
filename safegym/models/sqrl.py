@@ -30,6 +30,8 @@ class SQRLAgent:
         target_entropy="auto",
         actor_hidden_size=256,
         critic_hidden_size=256,
+        alpha_learning_rate=0.0001,
+        nu_learning_rate=0.00001,
     ):
         self.device = torch.device(
             "cuda" if torch.cuda.is_available() else "cpu"
@@ -105,7 +107,7 @@ class SQRLAgent:
             )  # maybe init with sme value
             # one alpha for all
             self.alpha_optimizer = optim.Adam(
-                [self.log_alpha], lr=critic_learning_rate
+                [self.log_alpha], lr=alpha_learning_rate
             )  # dnk needs square
         else:
             self.log_alpha = torch.tensor(
@@ -117,7 +119,7 @@ class SQRLAgent:
         )
         if self.log_nu.requires_grad:
             self.log_nu_optimizer = optim.Adam(
-                [self.log_nu], lr=critic_learning_rate
+                [self.log_nu], lr=nu_learning_rate
             )
 
     def select_action(self, state):

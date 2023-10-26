@@ -28,6 +28,8 @@ class SQRLAgent:
         auto_nu_tuning=True,
         gradient_steps=1,
         target_entropy="auto",
+        actor_hidden_size=256,
+        critic_hidden_size=256,
     ):
         self.device = torch.device(
             "cuda" if torch.cuda.is_available() else "cpu"
@@ -43,16 +45,22 @@ class SQRLAgent:
         self.epsilon_safe = epsilon_safe
         self.gradient_steps = gradient_steps
 
-        self.actor = Actor(self.obs_dim, self.action_dim).to(self.device)
-        self.critic1 = Critic(self.obs_dim, self.action_dim).to(self.device)
-        self.critic2 = Critic(self.obs_dim, self.action_dim).to(self.device)
+        self.actor = Actor(
+            self.obs_dim, self.action_dim, hidden_size=actor_hidden_size
+        ).to(self.device)
+        self.critic1 = Critic(
+            self.obs_dim, self.action_dim, hidden_size=critic_hidden_size
+        ).to(self.device)
+        self.critic2 = Critic(
+            self.obs_dim, self.action_dim, hidden_size=critic_hidden_size
+        ).to(self.device)
 
-        self.target_critic1 = Critic(self.obs_dim, self.action_dim).to(
-            self.device
-        )
-        self.target_critic2 = Critic(self.obs_dim, self.action_dim).to(
-            self.device
-        )
+        self.target_critic1 = Critic(
+            self.obs_dim, self.action_dim, hidden_size=critic_hidden_size
+        ).to(self.device)
+        self.target_critic2 = Critic(
+            self.obs_dim, self.action_dim, hidden_size=critic_hidden_size
+        ).to(self.device)
 
         self.target_critic1.load_state_dict(self.critic1.state_dict())
         self.target_critic2.load_state_dict(self.critic2.state_dict())
@@ -67,9 +75,9 @@ class SQRLAgent:
             self.critic2.parameters(), lr=critic_learning_rate
         )
 
-        self.safety_critic = SafetyCritic(self.obs_dim, self.action_dim).to(
-            self.device
-        )
+        self.safety_critic = SafetyCritic(
+            self.obs_dim, self.action_dim, hidden_size=critic_hidden_size
+        ).to(self.device)
         self.safety_critic_optimizer = optim.Adam(
             params=self.safety_critic.parameters(), lr=critic_learning_rate
         )

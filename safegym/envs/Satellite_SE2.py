@@ -155,6 +155,7 @@ class Satellite_SE2(gym.Env):  # type: ignore
             tuple[int], np.dtype[np.float32]
         ] = REWARD_WEIGHTS,
         doubleintegrator: bool = False,
+        penalize_target_crash: bool = False,
     ):
         super(Satellite_SE2, self).__init__()
         assert isinstance(underactuated, bool)
@@ -188,6 +189,7 @@ class Satellite_SE2(gym.Env):  # type: ignore
         self.reward_history = []
         self.separate_reward_history = []
         self.time_step = -1
+        self.penalize_target_crash = penalize_target_crash
 
         self.build_action_space()
         self.normalized_obs = normalized_obs
@@ -595,7 +597,10 @@ class Satellite_SE2(gym.Env):  # type: ignore
                 )
             if self.crash():
                 self.is_unsafe = True
-                return np.float32(-5000 * (ch_speed + 1e-4))
+                if self.penalize_target_crash:
+                    return np.float32(-5000 * (ch_speed + 1e-4))
+                else:
+                    return np.float32(0)
 
         if self.out_of_bounds():
             self.terminated = True

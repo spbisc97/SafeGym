@@ -13,7 +13,7 @@ CWD = pathlib.Path(__file__).absolute().parent
 
 setup(
     name="safegym",
-    version="0.15",
+    version="0.16",
     include_dirs=["safegym", "safegym.*"],
     install_requires=[
         "numpy>=1.23",

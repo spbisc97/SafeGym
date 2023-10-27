@@ -3,6 +3,7 @@ import sys
 import os
 import numpy as np
 import logging
+from safegym.envs import *
 
 logging.basicConfig(level=logging.INFO)
 k = np.array(
@@ -140,8 +141,9 @@ def test_reward():
     plt.plot(seprew[:, 3], label="speed")
     plt.plot(seprew[:, 4], label="angle_speed")
     plt.legend()
-    plt.subplot(2, 1, 2)
-    plt.plot(rewards[0:-1], label="total")
+    ax = plt.subplot(2, 1, 2)
+    plt.plot(rewards, label="total")
+    ax.set_yscale("symlog", linthresh=0.01)
     plt.legend()
 
     plt.show()
@@ -163,7 +165,7 @@ def test_reward_doubleint():
         unconstrained=True,
         doubleintegrator=True,
     )
-    TimeLimit(env, max_episode_steps=10000)
+    TimeLimit(env, max_episode_steps=20000)
     env.reset()
     rewards = []
     done = False
@@ -207,7 +209,7 @@ def test_reward_doubleint():
     plt.plot(seprew[:, 4], label="angle_speed")
     plt.legend()
     plt.subplot(2, 1, 2)
-    plt.plot(rewards[0:-1], label="total")
+    plt.plot(rewards, label="total")
     plt.legend()
 
     plt.show()

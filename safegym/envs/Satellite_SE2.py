@@ -155,7 +155,7 @@ class Satellite_SE2(gym.Env):  # type: ignore
             tuple[int], np.dtype[np.float32]
         ] = REWARD_WEIGHTS,
         doubleintegrator: bool = False,
-        penalize_target_crash: bool = False,
+        penalize_target_crash: bool = True,
     ):
         super(Satellite_SE2, self).__init__()
         assert isinstance(underactuated, bool)
@@ -257,6 +257,8 @@ class Satellite_SE2(gym.Env):  # type: ignore
         if not self.action_space.contains(action):
             raise Exception(f"{action!r} invalid")
         assert self.time_step != -1, "Must reset environment first"
+        self.is_unsafe = False
+        self.is_success = False
         self.chaser.set_control(self.__action_filter(action))
         self.chaser.step()
         observation = self.__get_observation()

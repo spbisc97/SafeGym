@@ -24,30 +24,28 @@ SafeGym is a Gymnasium environment coupled with tools aimed at facilitating Safe
 
 ## Getting Started
 
-Clone the repository to your local machine:
-
-```bash
-git clone https://github.com/spbisc97/SafeGym.git
-cd SafeGym
-```
-
-Ensure you have the necessary dependencies installed. The primary dependencies include:
+Ensure you have the necessary dependencies installed in your env. The primary dependencies include:
 
 - gymnasium
 - numpy
 - matplotlib
 
-
-## Usage
-
 ### Install
+Using git:
 ```bash
+git clone https://github.com/spbisc97/SafeGym.git
+cd SafeGym
 pip install -e .
+```
+or using pipy python 
+```
+pip install safegym
 ```
 ### Run a simple experiment
 
 ```python
 import safegym
+from safegym.envs import *
 import gymnasium as gym
 
 env = gym.make('Satellite-SE',render_mode="human")
@@ -62,7 +60,8 @@ while not DONE
 env.close()
 ```
 
-
+### Documentation
+TBD
 
 
 

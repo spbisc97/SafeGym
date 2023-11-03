@@ -28,7 +28,6 @@ matplotlib.rcParams["path.simplify"] = True
 #     or (("seaborn" and "whitegrid") in style)
 # ]
 # pltstyle.append("fast")
-@staticmethod
 def generate_stable_trajectory(
     radius: np.float32, theta: np.float32, theta_dot: np.float32
 ) -> np.ndarray[tuple[int], np.dtype[np.float32]]:
@@ -39,7 +38,8 @@ def generate_stable_trajectory(
     state[3] = radius / 2000  # vx
     state[4] = 0  # vy
     state[5] = theta_dot  # omega
-    return state
+
+    return state.astype(np.float32)
 
 
 # mplstyle.use(pltstyle)
@@ -59,11 +59,11 @@ STEP: np.float32 = np.float32(0.05)  # [s]
 VROT_MAX = np.float32(2 * np.pi)  # [rad/s]
 VTRANS_MAX = np.float32(50)  # [m/s]
 
-XY_MAX = np.float32(5)  # [m]
+XY_MAX = np.float32(100)  # [m]
 
 XY_PLOT_MAX = np.float32(5)  # [m]
 
-y0: np.float32 = np.float32(2.5)  # [m]
+y0: np.float32 = np.float32(50)  # [m]
 # STARTING_STATE=
 radius: np.float32 = y0  # [m],
 theta: np.float32 = np.float32(0)  # [rad],
@@ -1310,6 +1310,7 @@ def _test6():
 
 def _test8():
     from moviepy.editor import ImageSequenceClip
+    import time
 
     k = np.array(
         [
@@ -1332,19 +1333,27 @@ def _test8():
             [
                 0.000000000000000,
                 0.000000000000000,
-                0.000100000000000,
+                0.100000000000,
                 -0.000000000000000,
                 0.000000000000000,
-                0.015818032751518,
+                1.5818032751518,
             ],
         ],
         dtype=np.float32,
     )
+    STARTING_STATE_CHASER = generate_stable_trajectory(10, 0, 0)
+    STARTING_STATE_TARGET = np.array([phi, phi_dot], dtype=np.float32)
 
+    STARTING_STATE = np.concatenate(
+        [STARTING_STATE_CHASER, STARTING_STATE_TARGET], dtype=np.float32
+    )
+
+    time.sleep(3)
     env = Satellite_SE2(
         underactuated=True,
         render_mode="rgb_array",
         step=np.float32(0.05),
+        # starting_state=STARTING_STATE,
     )
     observation, info = env.reset()
     observations = [observation]
@@ -1355,9 +1364,9 @@ def _test8():
     action_under = np.array([0, 0], dtype=np.float32)
     env.action_space.sample()
     print(env.action_space.sample())
-    for _ in range(200000):
+    for _ in range(800000):
         state = env.chaser.get_state()
-        action_full = -k @ env.chaser.get_state()
+        action_full = -k @ state
         act_norm = np.linalg.norm(action_full[0:2])
         # if act_norm > FTMAX:
         # action_full[0:2] = action_full[0:2] / act_norm * FTMAX
@@ -1365,26 +1374,28 @@ def _test8():
             [0, 0, np.arctan2(action_full[1], action_full[0]), 0, 0, 0],
             dtype=np.float32,
         )
-        print(ref_state)
-        error = ref_state - env.chaser.get_state()
+        error = ref_state - state
+        error[2] = error[2] - np.floor(
+            (1 / (np.pi * 4)) * ((2 * error[2]) + (np.pi * 2))
+        ) * (np.pi * 2)
+
         action_under = np.array(
-            [act_norm / (1 + np.power(10 * error[2], 2)), k[2, :] @ (error)],
+            [act_norm, k[2, :] @ (error)],
             dtype=np.float32,
         )
-        if _ < 4000:
+        if _ < 1000:
             action_under = np.array([0, 0], dtype=np.float32)
         observation, reward, term, trunc, info = env.step(action_under)
         actions.append(action_under)
         observations.append(observation)
         rewards.append(reward)
-        # if _ % 200 == 0:
-        # frames.append(env.render())
-
+        if _ % 200 == 0:
+            frames.append(env.render())
     env.close()
 
-    clip = ImageSequenceClip(frames, fps=50)
-    save_path = "./video_under_lqr.mp4"
-    clip.write_videofile(save_path, fps=50)
+    clip = ImageSequenceClip(frames, fps=400)
+    save_path = "./video_under_lqr.gif"
+    clip.write_gif(save_path, fps=15)
     plt.plot(actions)
     plt.show()
 
@@ -1400,4 +1411,4 @@ def _scalene_profiler():
 if __name__ == "__main__":
     from gymnasium.envs.registration import register
 
-    _test6()
+    _test8()

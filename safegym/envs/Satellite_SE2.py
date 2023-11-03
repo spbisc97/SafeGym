@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import matplotlib.style as mplstyle
 from matplotlib.patches import Circle
 import warnings
+import pygame
 
 # matplotlib.use(
 #     "TKAgg"
@@ -203,6 +204,12 @@ class Satellite_SE2(gym.Env):  # type: ignore
         )
         self.target = self.Target()
         self.reset()
+        if self.render_mode == "human":
+            # pygame.init()
+
+            self.screen = pygame.display.set_mode((800, 600))
+            pygame.display.set_caption("Satellite SE2 Environment")
+            self.clock = pygame.time.Clock()
 
         return
 
@@ -299,22 +306,35 @@ class Satellite_SE2(gym.Env):  # type: ignore
     def render(self):
         """Render the environment."""
         if self.render_mode == "human":
-            if self.fig is None or self.ax is None:
-                self.fig, self.ax = plt.subplots(layout="constrained")
-                self.ax.set_xlim(-self.xy_plot_lim, self.xy_plot_lim)
-                self.ax.set_ylim(-self.xy_plot_lim, self.xy_plot_lim)
-                self.ax.set_title("Satellite SE2 Environment")
-                plt.ion()  # Turn on interactive mode
+            # use double buffering to reduce flicker
+            # drawing_surface = pygame.Surface(self.screen.get_size())
+            self.screen.fill((0, 0, 0))
+            chaser_state = self.chaser.get_state()
+            # target_state = self.target.get_state()
 
-            if (
-                self.time_step % self.metadata["render_steps"] != 0
-            ):  # Plot with fps
-                return
+            # draw the target
+            target_x, target_y = 400, 300
+            pygame.draw.circle(
+                self.screen, (255, 0, 0), (int(target_x), int(target_y)), 10
+            )
 
-            self.__draw_satellite()
+            # draw the chaser
+            chaser_x = target_x + chaser_state[0]
+            chaser_y = target_y - chaser_state[1]
+            pygame.draw.circle(
+                self.screen, (0, 0, 255), ((chaser_x), (chaser_y)), 5
+            )
+            self.screen.blit(self.screen, (0, 0))
 
-            # Display the plot
-            plt.pause(0.00001)  # Pause to show frame
+            # Print the FPS on the window
+            font = pygame.font.Font(None, 36)  # Choose a font and font size
+            fps_text = font.render(
+                f"FPS: {int(self.clock.get_fps())}", True, (255, 255, 255)
+            )
+            self.screen.blit(fps_text, (10, 10))  # Position of the FPS text
+            if self.time_step % 100 == 0:
+                pygame.display.update()
+            self.clock.tick(10000)  # Set desired frames per second
 
         if self.render_mode == "graph":
             # if False:  # if np.size(self.action_history, 1) % 2 == 0:
@@ -1351,7 +1371,7 @@ def _test8():
     time.sleep(3)
     env = Satellite_SE2(
         underactuated=True,
-        render_mode="rgb_array",
+        render_mode="human",
         step=np.float32(0.05),
         # starting_state=STARTING_STATE,
     )

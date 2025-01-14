@@ -44,10 +44,10 @@ class SQRLAgent:
             self.obs_dim = env.observation_space.shape[0]
         else:
             self.obs_dim = obs_dim
-        if actions_dim==False:
+        if action_dim==False:
             self.action_dim = env.action_space.shape[0]
         else:
-            self.actions=actions_dim
+            self.action_dim=action_dim
         self.gamma = gamma
         self.safe_gamma = safe_gamma
         self.tau = tau

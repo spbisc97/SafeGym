@@ -32,15 +32,22 @@ class SQRLAgent:
         critic_hidden_size=256,
         alpha_learning_rate=0.0001,
         nu_learning_rate=0.00001,
+        obs_dim=False,
+        action_dim=False,
     ):
         self.device = torch.device(
             "cuda" if torch.cuda.is_available() else "cpu"
         )
 
         self.env = env
-        self.obs_dim = env.observation_space.shape[0]
-        self.action_dim = env.action_space.shape[0]
-
+        if obs_dim==False: 
+            self.obs_dim = env.observation_space.shape[0]
+        else:
+            self.obs_dim = obs_dim
+        if actions_dim==False:
+            self.action_dim = env.action_space.shape[0]
+        else:
+            self.actions=actions_dim
         self.gamma = gamma
         self.safe_gamma = safe_gamma
         self.tau = tau

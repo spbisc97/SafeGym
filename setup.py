@@ -31,13 +31,6 @@ setup(
     include_dirs=["safegym", "safegym.*"],
     install_requires=_read_requirements(),
     extras_require={
-        # Optional acceleration
-        "numba": ["numba"],
-        # Optional rendering / video exports
-        "video": [
-            "moviepy>=2",
-            "imageio",  # for GIF writing when ffmpeg is unavailable
-        ],
         # Optional environments / tools
         "pygame": ["pygame"],  # SnakeEnv
         "sb3": ["stable-baselines3>=2"],  # examples and notebooks
@@ -48,9 +41,6 @@ setup(
         ],
         # Everything
         "all": [
-            "numba",
-            "moviepy>=2",
-            "imageio",
             "pygame",
             "stable-baselines3>=2",
             "gymnasium[mujoco]>=1.0",

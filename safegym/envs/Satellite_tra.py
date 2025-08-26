@@ -92,8 +92,20 @@ class Satellite_tra(gym.Env):
             render_mode is None or render_mode in self.metadata["render_modes"]
         )
         self.render_mode = render_mode
-        assert (matplotlib_backend in mpl.rcsetup.all_backends) or (
+        # Matplotlib backend compatibility (avoid deprecated rcsetup.all_backends)
+        try:
+            from matplotlib.backends.backend_registry import (
+                list_builtin as _mpl_list_backends,
+            )
+        except Exception:
+            from matplotlib import rcsetup as _rcsetup  # type: ignore
+
+            def _mpl_list_backends():  # type: ignore
+                return _rcsetup.all_backends  # type: ignore
+
+        assert (
             matplotlib_backend is None
+            or matplotlib_backend in _mpl_list_backends()
         )
         if matplotlib_backend:
             mpl.use(matplotlib_backend)

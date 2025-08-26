@@ -16,6 +16,18 @@ import random
 import time
 import warnings
 
+# Matplotlib backend compatibility: avoid deprecated rcsetup.all_backends
+try:
+    from matplotlib.backends.backend_registry import (
+        list_builtin as _mpl_list_backends,
+    )
+except Exception:
+    # Fallback for older Matplotlib
+    from matplotlib import rcsetup as _rcsetup  # type: ignore
+
+    def _mpl_list_backends():  # type: ignore
+        return _rcsetup.all_backends  # type: ignore
+
 # suppress warnings
 # warnings.filterwarnings("always", category=RuntimeWarning)
 
@@ -103,9 +115,10 @@ class Satellite_rot(gym.Env):
             render_mode is None or render_mode in self.metadata["render_modes"]
         )
         self.render_mode = render_mode
+        # Validate requested backend against available backends
         assert (
-            matplotlib_backend in mpl.rcsetup.all_backends
-            or matplotlib_backend is None
+            matplotlib_backend is None
+            or matplotlib_backend in _mpl_list_backends()
         )
         if matplotlib_backend:
             mpl.use(matplotlib_backend)

@@ -1180,7 +1180,15 @@ def _test4():
 
 
 def _test5():
-    from gymnasium.experimental.wrappers import HumanRenderingV0, RecordVideoV0
+    # Gymnasium wrappers compatibility: prefer stable API, fallback to experimental
+    try:
+        from gymnasium.wrappers import RecordVideo as RecordVideoV0  # type: ignore
+        from gymnasium.wrappers import HumanRendering as HumanRenderingV0  # type: ignore
+    except Exception:
+        from gymnasium.experimental.wrappers import (  # type: ignore
+            HumanRenderingV0,
+            RecordVideoV0,
+        )
 
     k = np.array(
         [

@@ -1333,6 +1333,24 @@ def _test6():
 
 
 def _test8():
+    """
+    Underactuated LQR-style demonstration with video capture.
+
+    This example uses a hand-tuned gain matrix `k` to compute a fully-actuated
+    control `action_full = -k @ state` and then maps it to the underactuated
+    action space [F, tau]. The mapping uses the desired thrust magnitude and
+    heading from `action_full` to define a reference orientation, then applies
+    the third row of `k` over the state error to compute the torque command.
+
+    Key steps
+    - Build a reference state with heading aligned to the thrust vector.
+    - Wrap the orientation error into [-pi, pi] to avoid discontinuities.
+    - Use action_under = [||thrust||, torque] for the underactuated env.
+    - Periodically grab rgb frames and write an animated GIF at the end.
+
+    Note: This is a long-running demo intended for interactive inspection,
+    not a unit test.
+    """
     # ImageSequenceClip imported at module level with MoviePy v2/v1 fallback
     import time
 
@@ -1365,6 +1383,7 @@ def _test8():
         ],
         dtype=np.float32,
     )
+    # Optional custom starting state (kept unused below)
     STARTING_STATE_CHASER = generate_stable_trajectory(10, 0, 0)
     STARTING_STATE_TARGET = np.array([phi, phi_dot], dtype=np.float32)
 
@@ -1373,6 +1392,7 @@ def _test8():
     )
 
     time.sleep(3)
+    # Underactuated env: action = [thrust_magnitude, torque]
     env = Satellite_SE2(
         underactuated=True,
         render_mode="rgb_array",
@@ -1388,35 +1408,44 @@ def _test8():
     action_under = np.array([0, 0], dtype=np.float32)
     env.action_space.sample()
     print(env.action_space.sample())
-    for _ in range(800000):
+    for _ in range(800000):  # long rollout to visualize behavior
         state = env.chaser.get_state()
+        # Fully-actuated "virtual" action from simple LQR-like gain
         action_full = -k @ state
+        # Magnitude of desired translational thrust
         act_norm = np.linalg.norm(action_full[0:2])
         # if act_norm > FTMAX:
         # action_full[0:2] = action_full[0:2] / act_norm * FTMAX
+        # Align desired heading with the thrust direction from action_full
         ref_state = np.array(
             [0, 0, np.arctan2(action_full[1], action_full[0]), 0, 0, 0],
             dtype=np.float32,
         )
+        # State error for torque computation
         error = ref_state - state
+        # Wrap orientation error into [-pi, pi] to avoid angle jumps
         error[2] = error[2] - np.floor(
             (1 / (np.pi * 4)) * ((2 * error[2]) + (np.pi * 2))
         ) * (np.pi * 2)
 
+        # Map to underactuated control: [F, tau]
         action_under = np.array(
             [act_norm, k[2, :] @ (error)],
             dtype=np.float32,
         )
+        # Initial settling period with zero control
         if _ < 1000:
             action_under = np.array([0, 0], dtype=np.float32)
         observation, reward, term, trunc, info = env.step(action_under)
         actions.append(action_under)
         observations.append(observation)
         rewards.append(reward)
+        # Capture frames at a lower rate for lighter output
         if _ % 200 == 0:
             frames.append(env.render())
     env.close()
 
+    # Build an animated GIF from collected frames (fallback encoder via imageio)
     clip = ImageSequenceClip(frames, fps=400)
     save_path = "./video_under_lqr.gif"
     clip.write_gif(save_path, fps=15)

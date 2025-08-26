@@ -1065,7 +1065,7 @@ except ModuleNotFoundError:
     print("Consider installing numba for compiled and parallelised methods.")
 
 
-def _test():
+def _test(): # non regression test
     from stable_baselines3.common.env_checker import check_env
 
     check_env(Satellite_SE2(), warn=True)
@@ -1073,6 +1073,8 @@ def _test():
 
 
 def _test2(underactuated=True):
+    # non regression test and integration test
+    # check rendering and step function
     env = Satellite_SE2(
         underactuated=underactuated,
         render_mode="human",
@@ -1099,7 +1101,8 @@ def _test2(underactuated=True):
     return
 
 
-def _test3(underactuated=True):
+def _test3(underactuated=True): 
+    #not to be moved from here
     from stable_baselines3 import DDPG, PPO
 
     register(
@@ -1155,7 +1158,8 @@ def _test3(underactuated=True):
     plt.show()
 
 
-def _test4():
+def _test4(): 
+    # non regression test and integration test
     # check just the dynamics
 
     env = Satellite_SE2(
@@ -1261,6 +1265,7 @@ def _test5():
 
 
 def _test6():
+    # ImageSequenceClip imported at module level with MoviePy v2/v1 fallback
 
     k = np.array(
         [

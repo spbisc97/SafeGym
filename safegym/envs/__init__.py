@@ -1,9 +1,26 @@
 from gymnasium.envs.registration import register
+import warnings
 
-from safegym.envs.Snake_v0 import SnakeEnv
+# Import envs defensively to avoid optional dependency failures (e.g., pygame, mujoco)
+try:
+    from safegym.envs.Snake_v0 import SnakeEnv  # requires pygame
+    _HAS_SNAKE = True
+except Exception as _e:
+    SnakeEnv = None  # type: ignore
+    _HAS_SNAKE = False
+    warnings.warn(f"SnakeEnv unavailable: {_e}")
+
 from safegym.envs.Satellite_rot import Satellite_rot
 from safegym.envs.Satellite_tra import Satellite_tra
-from safegym.envs.Satellite_mujoco import MujSatEnv
+
+try:
+    from safegym.envs.Satellite_mujoco import MujSatEnv  # may require mujoco extras
+    _HAS_MUJOCO = True
+except Exception as _e:
+    MujSatEnv = None  # type: ignore
+    _HAS_MUJOCO = False
+    warnings.warn(f"Mujoco env unavailable: {_e}")
+
 from safegym.envs.Satellite_SE2 import Satellite_SE2
 
 __al__ = [
@@ -16,10 +33,11 @@ __al__ = [
 
 __version__ = "0.1"
 
-register(
-    id="Snake-v0",
-    entry_point="safegym.envs.Snake_v0:SnakeEnv",
-)
+if _HAS_SNAKE:
+    register(
+        id="Snake-v0",
+        entry_point="safegym.envs.Snake_v0:SnakeEnv",
+    )
 register(
     id="Satellite-v0",
     entry_point="safegym.envs.Satellite:Satellite_base",
@@ -46,12 +64,13 @@ register(
     reward_threshold=0.0,
 )
 
-register(
-    id="Satellite-mj-v0",
-    entry_point="safegym.envs.Satellite_mujoco:MujSatEnv",
-    max_episode_steps=60_000,
-    reward_threshold=0.0,
-)
+if _HAS_MUJOCO:
+    register(
+        id="Satellite-mj-v0",
+        entry_point="safegym.envs.Satellite_mujoco:MujSatEnv",
+        max_episode_steps=60_000,
+        reward_threshold=0.0,
+    )
 
 register(
     id="Satellite-SE2-v0",

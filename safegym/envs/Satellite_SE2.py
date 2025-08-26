@@ -1027,7 +1027,7 @@ class Satellite_SE2(gym.Env):  # type: ignore
 
         def reset(
             self,
-            state: np.ndarray[tuple[int], np.dtype[np.float32]] = np.zeros(
+            state: np.ndarray[tuple[int], np.float32] = np.zeros(
                 (2,), dtype=np.float32
             ),
         ):
@@ -1087,7 +1087,7 @@ def _test2(underactuated=True):
 
 def _test3(underactuated=True):
     from stable_baselines3 import DDPG, PPO
-    from moviepy.editor import ImageSequenceClip
+    from moviepy.video.io import ImageSequenceClip
 
     register(
         id="Satellite_SE2-v0",
@@ -1168,7 +1168,7 @@ def _test4():
 
 def _test5():
     from gymnasium.experimental.wrappers import HumanRenderingV0, RecordVideoV0
-    from moviepy.editor import ImageSequenceClip
+    from moviepy.video.io import ImageSequenceClip
 
     k = np.array(
         [
@@ -1241,7 +1241,7 @@ def _test5():
 
 
 def _test6():
-    from moviepy.editor import ImageSequenceClip
+    from moviepy.video.io import ImageSequenceClip
 
     k = np.array(
         [
@@ -1309,7 +1309,7 @@ def _test6():
 
 
 def _test8():
-    from moviepy.editor import ImageSequenceClip
+    from moviepy.video.io import ImageSequenceClip
     import time
 
     k = np.array(

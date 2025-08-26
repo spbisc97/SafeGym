@@ -1041,7 +1041,7 @@ class Satellite_SE2(gym.Env):  # type: ignore
 
         def reset(
             self,
-            state: np.ndarray[tuple[int], np.float32] = np.zeros(
+            state = np.zeros(
                 (2,), dtype=np.float32
             ),
         ):

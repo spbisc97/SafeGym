@@ -91,7 +91,7 @@ def test_rgb_graph():
 
 def test_reward():
     from safegym.envs import Satellite_SE2
-    from gymnasium.wrappers.time_limit import TimeLimit
+    from gymnasium.wrappers import TimeLimit
     import time
     from matplotlib import pyplot as plt
 
@@ -153,7 +153,7 @@ def test_reward():
 
 def test_reward_doubleint():
     from safegym.envs import Satellite_SE2
-    from gymnasium.wrappers.time_limit import TimeLimit
+    from gymnasium.wrappers import TimeLimit
     import time
     from matplotlib import pyplot as plt
 

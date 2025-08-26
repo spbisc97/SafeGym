@@ -7,6 +7,20 @@ import matplotlib.pyplot as plt
 import matplotlib.style as mplstyle
 from matplotlib.patches import Circle
 import warnings
+# MoviePy compatibility (v1 -> v2):
+# - Prefer MoviePy v2 import path, with graceful fallbacks to v1 layouts.
+try:  # MoviePy v2 preferred
+    from moviepy import ImageSequenceClip  # type: ignore
+except Exception:
+    try:  # MoviePy v2 possible submodule or older v1 editor
+        from moviepy.video import ImageSequenceClip  # type: ignore
+    except Exception:
+        try:  # MoviePy v1 common import
+            from moviepy.editor import ImageSequenceClip  # type: ignore
+        except Exception:  # MoviePy v1 explicit module path
+            from moviepy.video.io.ImageSequenceClip import (  # type: ignore
+                ImageSequenceClip,
+            )
 
 # matplotlib.use(
 #     "TKAgg"
@@ -1087,7 +1101,6 @@ def _test2(underactuated=True):
 
 def _test3(underactuated=True):
     from stable_baselines3 import DDPG, PPO
-    from moviepy.video.io import ImageSequenceClip
 
     register(
         id="Satellite_SE2-v0",
@@ -1168,7 +1181,6 @@ def _test4():
 
 def _test5():
     from gymnasium.experimental.wrappers import HumanRenderingV0, RecordVideoV0
-    from moviepy.video.io import ImageSequenceClip
 
     k = np.array(
         [
@@ -1241,7 +1253,6 @@ def _test5():
 
 
 def _test6():
-    from moviepy.video.io import ImageSequenceClip
 
     k = np.array(
         [
@@ -1309,7 +1320,7 @@ def _test6():
 
 
 def _test8():
-    from moviepy.video.io import ImageSequenceClip
+    # ImageSequenceClip imported at module level with MoviePy v2/v1 fallback
     import time
 
     k = np.array(

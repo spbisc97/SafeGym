@@ -7,6 +7,7 @@ from setuptools import setup, find_packages
 
 
 import pathlib
+import re
 
 CWD = pathlib.Path(__file__).absolute().parent
 
@@ -23,6 +24,28 @@ def _read_requirements(filename: str = "requirements.txt"):
                 continue
             lines.append(line)
     return lines
+
+# Optional safety check: if moviepy is already installed but < 2, raise
+def _assert_moviepy_v2_if_installed():
+    try:
+        import importlib
+        mp = importlib.import_module("moviepy")
+        ver = getattr(mp, "__version__", "0")
+        m = re.match(r"(\d+)\.(\d+)", ver or "0")
+        major = int(m.group(1)) if m else 0
+        if major < 2:
+            raise RuntimeError(
+                f"Detected moviepy {ver}. SafeGym requires moviepy>=2. "
+                "Please upgrade: pip install -U moviepy"
+            )
+    except ModuleNotFoundError:
+        # Not installed yet; pip will resolve via install_requires
+        pass
+    except Exception:
+        # Do not hard fail on unexpected environments
+        pass
+
+_assert_moviepy_v2_if_installed()
 
 
 setup(

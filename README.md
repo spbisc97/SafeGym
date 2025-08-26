@@ -37,10 +37,21 @@ git clone https://github.com/spbisc97/SafeGym.git
 cd SafeGym
 pip install -e .
 ```
-or using pipy python 
+or using pip (PyPI)
 ```
 pip install safegym
 ```
+
+Extras
+- Baseline (core deps only): `pip install -e .`
+- Mujoco env: `pip install -e .[mujoco]`
+- Stable-Baselines3 examples: `pip install -e .[sb3]`
+- Snake/pygame env: `pip install -e .[pygame]`
+- Everything: `pip install -e .[all]`
+
+Notes
+- MoviePy: The project requires moviepy>=2. If an older version is detected during installation, setup will raise a clear error. Upgrade via `pip install -U moviepy`.
+- Numba: Included by default for performance. If unavailable, code falls back to pure Python and will run slower.
 ### Run a simple experiment
 
 ```python
@@ -62,7 +73,6 @@ env.close()
 
 ### Documentation
 TBD
-
 
 
 

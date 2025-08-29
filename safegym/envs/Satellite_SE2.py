@@ -577,17 +577,17 @@ class Satellite_SE2(gym.Env):  # type: ignore
         w = self.chaser.get_state()
         theta = self.target.get_state()
         observation = np.zeros((10,), dtype=np.float32)
-        observation[0] = w[0]
-        observation[1] = w[1]
-        observation[2] = np.cos(w[2])
-        observation[3] = np.sin(w[2])
-        observation[4] = np.cos(theta[0])
-        observation[5] = np.sin(theta[0])
+        observation[0] = w[0] # x
+        observation[1] = w[1] # y
+        observation[2] = np.cos(w[2]) # cos(theta)
+        observation[3] = np.sin(w[2]) # sin(theta)
+        observation[4] = np.cos(theta[0]) # cos(phi) target
+        observation[5] = np.sin(theta[0]) # sin(phi) target
 
-        observation[6] = w[3]
-        observation[7] = w[4]
-        observation[8] = w[5]
-        observation[9] = theta[1]
+        observation[6] = w[3] # vx
+        observation[7] = w[4] # vy
+        observation[8] = w[5] # omega
+        observation[9] = theta[1] # phi_dot target
         return observation
 
     def __get_state(self) -> np.ndarray[tuple[int], np.dtype[np.float32]]:

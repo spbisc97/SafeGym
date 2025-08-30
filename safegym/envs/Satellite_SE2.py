@@ -65,15 +65,16 @@ MASS = 30 + 10  # [kg]
 MU = 3.986004418 * 10**14  # [m^3/s^2]
 RT = 6.6 * 1e6  # [m]
 NU = np.sqrt(MU / RT**3)
-FMAX = 1.05e-3  # [N]
+NU2 = NU * NU  # precompute for dynamics
+FMAX = 1.05e-1  # [N]
 TMAX: np.float32 = np.float32(1e-4)  # [Nm]
 FTMAX: np.float32 = np.float32(1e-3)  # just to clip with the same value for
 STEP: np.float32 = np.float32(0.05)  # [s]
 
-VROT_MAX = np.float32(2 * np.pi)  # [rad/s]
-VTRANS_MAX = np.float32(50)  # [m/s]
+VROT_MAX = np.float32(4 * np.pi)  # [rad/s]
+VTRANS_MAX = np.float32(80)  # [m/s]
 
-XY_MAX = np.float32(100)  # [m]
+XY_MAX = np.float32(500)  # [m]
 
 XY_PLOT_MAX = np.float32(5)  # [m]
 
@@ -170,6 +171,8 @@ class Satellite_SE2(gym.Env):  # type: ignore
         ] = REWARD_WEIGHTS,
         doubleintegrator: bool = False,
         penalize_target_crash: bool = True,
+        validate_actions: bool = False,
+        track_history: bool = True,
     ):
         super(Satellite_SE2, self).__init__()
         assert isinstance(underactuated, bool)
@@ -198,12 +201,16 @@ class Satellite_SE2(gym.Env):  # type: ignore
         self.vrot_max = vrot_max
         self.vtrans_max = vtrans_max
         # Added lists for storing historical data plotting
+        self.track_history = track_history
         self.state_history = []
         self.action_history = []
         self.reward_history = []
         self.separate_reward_history = []
         self.time_step = -1
         self.penalize_target_crash = penalize_target_crash
+        self.validate_actions = validate_actions
+        self._prev_radius: np.float32 = np.float32(0.0)
+        self._obs_warned: bool = False
 
         self.build_action_space()
         self.normalized_obs = normalized_obs
@@ -252,12 +259,15 @@ class Satellite_SE2(gym.Env):  # type: ignore
         self.reward_history = []
         self.separate_reward_history = []
         self.time_step = 0
+        self._obs_warned = False
         self.terminated = False
         self.truncated = False
         self.is_success = False
         self.is_unsafe = False
         observation = self.__get_observation()
         self.xy_plot_lim = self.chaser.radius() * 2
+        # initialize previous radius for shaping term
+        self._prev_radius = self.chaser.radius()
         info = {
             "is_success": self.is_success,
             "time_step": self.time_step,
@@ -268,7 +278,7 @@ class Satellite_SE2(gym.Env):  # type: ignore
     def step(
         self, action: np.ndarray
     ) -> tuple[Any, np.float32, bool, bool, dict[str, Any]]:
-        if not self.action_space.contains(action):
+        if self.validate_actions and (not self.action_space.contains(action)):
             raise Exception(f"{action!r} invalid")
         assert self.time_step != -1, "Must reset environment first"
         self.is_unsafe = False
@@ -288,9 +298,12 @@ class Satellite_SE2(gym.Env):  # type: ignore
         # "reward": reward,}
         if self.render_mode in ["human"]:
             self.render()  # Update the rendering after every action
-        self.action_history.append(self.chaser.get_control())
-        self.state_history.append(self.__get_state())
+        if self.track_history:
+            self.action_history.append(self.chaser.get_control())
+            self.state_history.append(self.__get_state())
         self.reward_history.append(reward)
+        # update previous radius after reward computation
+        self._prev_radius = self.chaser.radius()
 
         if not self.terminated:
             pass
@@ -527,9 +540,8 @@ class Satellite_SE2(gym.Env):  # type: ignore
             (0, 0), 1, color="green", fill=False, linewidth=1, alpha=0.5
         )
         self.ax.add_patch(CIRCLE)
-        self.ax.plot(
-            [], color="green", label=f"Rew: {self._reward_function():.2e}"
-        )
+        last_reward = self.reward_history[-1] if len(self.reward_history) > 0 else 0.0
+        self.ax.plot([], color="green", label=f"Rew: {last_reward:.2e}")
 
         # Legend, grid, and title
         self.ax.legend()
@@ -564,9 +576,9 @@ class Satellite_SE2(gym.Env):  # type: ignore
         observation[7] = w[4] / self.vtrans_max
         observation[8] = w[5] / self.vrot_max
         observation[9] = theta[1] / self.vrot_max
-        if any((np.abs(observation)) > 1):
-            warnings.warn("Observation is not normalized")
-            print(observation)
+        if not self._obs_warned and np.any(np.abs(observation) > 1):
+            warnings.warn("Observation is not normalized (clipping/limits exceeded)")
+            self._obs_warned = True
         # i could just add here term or trunc conditions
 
         return observation
@@ -624,11 +636,9 @@ class Satellite_SE2(gym.Env):  # type: ignore
 
         # for shaping i could add a reward for the radius lowering
 
-        # Encourage the agent to minimize the distance
+        # Encourage the agent to minimize the distance (use cached prev radius)
         if self.time_step != 0:
-            reward_decreased_distance = (
-                np.linalg.norm(self.state_history[-1][0:2])
-            ) - ch_radius
+            reward_decreased_distance = self._prev_radius - ch_radius
         else:
             reward_decreased_distance = 0
         reward_decreased_distance = reward_decreased_distance / self.xy_max
@@ -825,24 +835,27 @@ class Satellite_SE2(gym.Env):  # type: ignore
                 self.set_state(state)
             assert underactuated in [True, False]
             self.underactuated = underactuated
+            # preallocate working buffers to reduce allocations
+            self._dw = np.zeros((6,), dtype=np.float32)
+            self._tmp = np.zeros((6,), dtype=np.float32)
+            self._k1 = np.zeros((6,), dtype=np.float32)
+            self._k2 = np.zeros((6,), dtype=np.float32)
+            self._k3 = np.zeros((6,), dtype=np.float32)
+            self._k4 = np.zeros((6,), dtype=np.float32)
 
             if underactuated:
                 if doubleintegrator:
-                    self.__sat_dyn = (
-                        self.__sat_dyn_underactuated_doubleintegrator
-                    )
+                    self._sat_dyn = _dyn_underactuated_doubleintegrator
                 else:
-                    self.__sat_dyn = self.__sat_dyn_underactuated
+                    self._sat_dyn = _dyn_underactuated
 
                 self.control = np.zeros((2,), dtype=np.float32)
                 self.control_space = 2  # avoid gym space check
             else:
                 if doubleintegrator:
-                    self.__sat_dyn = (
-                        self.__sat_dyn_fullyactuated_doubleintegrator
-                    )
+                    self._sat_dyn = _dyn_fullyactuated_doubleintegrator
                 else:
-                    self.__sat_dyn = self.__sat_dyn_fullyactuated
+                    self._sat_dyn = _dyn_fullyactuated
 
                 self.control = np.zeros((3,), dtype=np.float32)
                 self.control_space = 3  # avoid gym space check
@@ -884,107 +897,103 @@ class Satellite_SE2(gym.Env):  # type: ignore
         def get_control(self) -> np.ndarray[tuple[int], np.dtype[np.float32]]:
             return np.array(self.control)
 
-        def __sat_dyn_underactuated(
+        def _sat_dyn_underactuated(
             self,
-            t: SupportsFloat,
+            out: np.ndarray[tuple[int], np.dtype[np.float32]],
             w: np.ndarray[tuple[int], np.dtype[np.float32]],
             u: np.ndarray[tuple[int], np.dtype[np.float32]],
-        ):
-            # u = [fx, tau]
+        ) -> np.ndarray[tuple[int], np.dtype[np.float32]]:
+            # u = [F, tau]
+            c = np.cos(w[2])
+            s = np.sin(w[2])
+            out[0] = w[3]
+            out[1] = w[4]
+            out[2] = w[5]
+            out[3] = (3 * NU2 * w[0]) + (2 * NU * w[4]) + (c * u[0] / MASS)
+            out[4] = (-2 * NU * w[3]) + (s * u[0] / MASS)
+            out[5] = INERTIA_INV * u[1]
+            return out
 
-            dw = np.zeros((6,), dtype=np.float32)
-            #  if symbolic:
-            #    dw = [t, t, t, t, t, t]
-            # else:
-            dw[0] = w[3]
-            dw[1] = w[4]
-            dw[2] = w[5]
-            dw[3] = (
-                (3 * (NU**2) * w[0])
-                + (2 * NU * w[4])
-                + (np.cos(w[2]) * u[0] / MASS)
-            )
-
-            dw[4] = (-2 * NU * w[3]) + (np.sin(w[2]) * u[0] / MASS)
-            dw[5] = INERTIA_INV * u[1]
-
-            return dw
-
-        def __sat_dyn_underactuated_doubleintegrator(
+        def _sat_dyn_underactuated_doubleintegrator(
             self,
-            t: SupportsFloat,
+            out: np.ndarray[tuple[int], np.dtype[np.float32]],
             w: np.ndarray[tuple[int], np.dtype[np.float32]],
             u: np.ndarray[tuple[int], np.dtype[np.float32]],
-        ):
-            dw = np.zeros((6,), dtype=np.float32)
-            dw[0] = w[3]
-            dw[1] = w[4]
-            dw[2] = w[5]
-            dw[3] = (np.cos(w[2])) * u[0] / MASS
-            dw[4] = (np.sin(w[2])) * u[0] / MASS
-            dw[5] = INERTIA_INV * u[1]
-            return dw
+        ) -> np.ndarray[tuple[int], np.dtype[np.float32]]:
+            c = np.cos(w[2])
+            s = np.sin(w[2])
+            out[0] = w[3]
+            out[1] = w[4]
+            out[2] = w[5]
+            out[3] = c * u[0] / MASS
+            out[4] = s * u[0] / MASS
+            out[5] = INERTIA_INV * u[1]
+            return out
 
-        def __sat_dyn_fullyactuated(
+        def _sat_dyn_fullyactuated(
             self,
-            t: SupportsFloat,
+            out: np.ndarray[tuple[int], np.dtype[np.float32]],
             w: np.ndarray[tuple[int], np.dtype[np.float32]],
             u: np.ndarray[tuple[int], np.dtype[np.float32]],
-        ):
-            # u = [fx, fu, tau]
+        ) -> np.ndarray[tuple[int], np.dtype[np.float32]]:
+            # u = [fx, fy, tau]
+            out[0] = w[3]
+            out[1] = w[4]
+            out[2] = w[5]
+            out[3] = (3 * NU2 * w[0]) + (2 * NU * w[4]) + (u[0] / MASS)
+            out[4] = (-2 * NU * w[3]) + (u[1] / MASS)
+            out[5] = INERTIA_INV * u[2]
+            return out
 
-            dw = np.zeros((6,), dtype=np.float32)
-            # if symbolic:
-            #     dw = [t, t, t, t, t, t]
-
-            dw[0] = w[3]
-            dw[1] = w[4]
-            dw[2] = w[5]
-            dw[3] = (3 * (NU**2) * w[0]) + (2 * NU * w[4]) + (u[0] / MASS)
-
-            dw[4] = (-2 * NU * w[3]) + (u[1] / MASS)
-            dw[5] = INERTIA_INV * u[2]
-            return dw
-
-        def __sat_dyn_fullyactuated_doubleintegrator(
+        def _sat_dyn_fullyactuated_doubleintegrator(
             self,
-            t: SupportsFloat,
+            out: np.ndarray[tuple[int], np.dtype[np.float32]],
             w: np.ndarray[tuple[int], np.dtype[np.float32]],
             u: np.ndarray[tuple[int], np.dtype[np.float32]],
-        ):
-            dw = np.zeros((6,), dtype=np.float32)
-            dw[0] = w[3]
-            dw[1] = w[4]
-            dw[2] = w[5]
-            dw[3] = u[0] / MASS
-            dw[4] = u[1] / MASS
-            dw[5] = INERTIA_INV * u[2]
-            return dw
+        ) -> np.ndarray[tuple[int], np.dtype[np.float32]]:
+            out[0] = w[3]
+            out[1] = w[4]
+            out[2] = w[5]
+            out[3] = u[0] / MASS
+            out[4] = u[1] / MASS
+            out[5] = INERTIA_INV * u[2]
+            return out
 
         def euler_step(self):
             ts: np.float32 = self.__step
-            t = np.zeros((1,), dtype=np.float32)
-            w: np.ndarray[tuple[int], np.dtype[np.float32]] = self.get_state()
-            u: np.ndarray[tuple[int], np.dtype[np.float32]] = (
-                self.get_control()
-            )
-            k1 = self.__sat_dyn(t, w, u)
-            self.set_state(w + ts * (k1))
-            return self.state
+            w = self.state
+            u = self.control
+            k1 = self._sat_dyn(self._dw, w, u)
+            # in-place: w += ts * k1
+            w += ts * k1
+            return w
 
         def rk4_step(self):
             ts: np.float32 = self.__step
-            t = np.zeros((1,), dtype=np.float32)
-            w: np.ndarray[tuple[int], np.dtype[np.float32]] = self.get_state()
-            u: np.ndarray[tuple[int], np.dtype[np.float32]] = (
-                self.get_control()
-            )
-            k1 = self.__sat_dyn(t, w, u)
-            k2 = self.__sat_dyn(t + 0.5 * ts, w + 0.5 * ts * k1, u)
-            k3 = self.__sat_dyn(t + 0.5 * ts, w + 0.5 * ts * k2, u)
-            k4 = self.__sat_dyn(t + ts, w + ts * k3, u)
-            self.set_state(w + ts * (k1 + 2 * k2 + 2 * k3 + k4) / 6)
-            return self.state
+            w = self.state
+            u = self.control
+            k1 = self._sat_dyn(self._k1, w, u)
+            # tmp = w + 0.5*ts*k1
+            np.multiply(k1, 0.5 * ts, out=self._tmp)
+            np.add(w, self._tmp, out=self._tmp)
+            k2 = self._sat_dyn(self._k2, self._tmp, u)
+            # tmp = w + 0.5*ts*k2
+            np.multiply(k2, 0.5 * ts, out=self._tmp)
+            np.add(w, self._tmp, out=self._tmp)
+            k3 = self._sat_dyn(self._k3, self._tmp, u)
+            # tmp = w + ts*k3
+            np.multiply(k3, ts, out=self._tmp)
+            np.add(w, self._tmp, out=self._tmp)
+            k4 = self._sat_dyn(self._k4, self._tmp, u)
+            # w += ts * (k1 + 2*k2 + 2*k3 + k4) / 6
+            np.multiply(k2, 2.0, out=self._tmp)
+            np.add(k1, self._tmp, out=self._tmp)
+            np.multiply(k3, 2.0, out=self._k3)
+            np.add(self._tmp, self._k3, out=self._tmp)
+            np.add(self._tmp, k4, out=self._tmp)
+            np.multiply(self._tmp, ts / 6.0, out=self._tmp)
+            np.add(w, self._tmp, out=w)
+            return w
 
         def reset(
             self,
@@ -1003,12 +1012,13 @@ class Satellite_SE2(gym.Env):  # type: ignore
             pass
 
         def radius(self) -> np.float32:
-            state = np.array(self.state)
-            return np.linalg.norm(state[0:2]).astype(np.float32)
+            s = self.state
+            # hypot is fast and allocation-free for 2D
+            return np.hypot(s[0], s[1]).astype(np.float32)
 
         def speed(self) -> np.float32:
-            state = np.array(self.state)
-            return np.linalg.norm(state[3:5]).astype(np.float32)
+            s = self.state
+            return np.hypot(s[3], s[4]).astype(np.float32)
 
         def symbolic_dynamics(self):
             pass
@@ -1041,7 +1051,7 @@ class Satellite_SE2(gym.Env):  # type: ignore
 
         def reset(
             self,
-            state = np.zeros(
+            state: np.ndarray[Tuple[int], np.dtype[np.float32]] = np.zeros(
                 (2,), dtype=np.float32
             ),
         ):
@@ -1054,15 +1064,64 @@ class Satellite_SE2(gym.Env):  # type: ignore
         # add dynamics later when speed is needed
 
 
+NUMBA_AVAILABLE = False
 try:
-    from numba import jit_module
+    from numba import njit  # type: ignore
 
-    jit_module(nopython=True, error_model="numpy")
-    print("Using Numba optimised methods.")
+    NUMBA_AVAILABLE = True
+except Exception:
+    NUMBA_AVAILABLE = False
 
-except ModuleNotFoundError:
-    print("Using native Python methods.")
-    print("Consider installing numba for compiled and parallelised methods.")
+
+def _dyn_underactuated(out, w, u):
+    c = np.cos(w[2])
+    s = np.sin(w[2])
+    out[0] = w[3]
+    out[1] = w[4]
+    out[2] = w[5]
+    out[3] = (3 * NU2 * w[0]) + (2 * NU * w[4]) + (c * u[0] / MASS)
+    out[4] = (-2 * NU * w[3]) + (s * u[0] / MASS)
+    out[5] = INERTIA_INV * u[1]
+    return out
+
+
+def _dyn_underactuated_doubleintegrator(out, w, u):
+    c = np.cos(w[2])
+    s = np.sin(w[2])
+    out[0] = w[3]
+    out[1] = w[4]
+    out[2] = w[5]
+    out[3] = c * u[0] / MASS
+    out[4] = s * u[0] / MASS
+    out[5] = INERTIA_INV * u[1]
+    return out
+
+
+def _dyn_fullyactuated(out, w, u):
+    out[0] = w[3]
+    out[1] = w[4]
+    out[2] = w[5]
+    out[3] = (3 * NU2 * w[0]) + (2 * NU * w[4]) + (u[0] / MASS)
+    out[4] = (-2 * NU * w[3]) + (u[1] / MASS)
+    out[5] = INERTIA_INV * u[2]
+    return out
+
+
+def _dyn_fullyactuated_doubleintegrator(out, w, u):
+    out[0] = w[3]
+    out[1] = w[4]
+    out[2] = w[5]
+    out[3] = u[0] / MASS
+    out[4] = u[1] / MASS
+    out[5] = INERTIA_INV * u[2]
+    return out
+
+
+if NUMBA_AVAILABLE:
+    _dyn_underactuated = njit(_dyn_underactuated, nogil=True)  # type: ignore
+    _dyn_underactuated_doubleintegrator = njit(_dyn_underactuated_doubleintegrator, nogil=True)  # type: ignore
+    _dyn_fullyactuated = njit(_dyn_fullyactuated, nogil=True)  # type: ignore
+    _dyn_fullyactuated_doubleintegrator = njit(_dyn_fullyactuated_doubleintegrator, nogil=True)  # type: ignore
 
 
 def _test(): # non regression test
